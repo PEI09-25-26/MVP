@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/background_gradient">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Jogo da Sueca"
+        android:textSize="28sp"
+        android:textColor="@android:color/white"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <EditText
+        android:id="@+id/inputName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Nome"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/edittext_bg"
+        android:padding="12dp"
+        android:textColor="@android:color/white"/>
+
+    <EditText
+        android:id="@+id/inputRoom"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="ID da sala (opcional)"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/edittext_bg"
+        android:padding="12dp"
+        android:textColor="@android:color/white"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnJoin"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="Entrar / Criar Sala"
+        android:textAllCaps="false"
+        app:backgroundTint="@color/orange"
+        android:textColor="@android:color/white"
+        app:cornerRadius="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnVision"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="▶ Jogar com visão artificial"
+        android:textAllCaps="false"
+        app:backgroundTint="@color/teal_700"
+        android:textColor="@android:color/white"
+        app:cornerRadius="12dp"
+        android:layout_marginTop="12dp"/>
+
+</LinearLayout>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MVP</string>
+
+    <string name="close_profile">Close Profile</string>
+    <string name="edit">Edit</string>
+    <string name="edit_avatar">Edit Avatar</string>
+    <string name="statistics_title">Estatísticas</string>
+    <string name="label_wins">Vitórias:</string>
+    <string name="label_win_rate">Win Rate:</string>
+    <string name="label_highest_score">Maior Pontuação:</string>
+    <string name="label_total_games">Jogos Totais:</string>
+    <string name="settings_title">Configurações</string>
+    <string name="label_edit_name">Editar Nome:</string>
+    <string name="sign_out_button">Sair da Conta</string>
+    <string name="close">Close</string>
+    <string name="friends">Amigos</string>
+    <string name="friends_list_description">A list of your friends</string>
+    <string name="username_hint">Username</string>
+    <string name="add_friend">Adicionar Amigo</string>
+    <string name="friend_added">Amigo adicionado</string>
+    <string name="online">ONLINE</string>
+    <string name="offline">OFFLINE</string>
+    <string name="join_room">Entrar na Sala</string>
+    <string name="joining_room_toast">Entrando na sala de %1$s</string>
+</resources>
