@@ -6,6 +6,12 @@
     android:layout_height="match_parent"
     android:padding="12dp">
 
+    <ImageView
+        android:id="@+id/backButton"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:src="@drawable/ic_back_arrow"/>
+
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="match_parent"

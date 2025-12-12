@@ -8,9 +8,9 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.camera.core.*
-import androidx.camera.core.R
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
@@ -30,9 +30,13 @@ class VisionActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_vision_game)
 
+        val btnBack = findViewById<ImageView>(R.id.backButton)
+
+        btnBack.setOnClickListener { finish() }
+
         if (allPermissionsGranted()) {
             startCamera()
-            connectWebSocket()
+            // connectWebSocket() // Desativado para teste da câmara
         } else {
             ActivityCompat.requestPermissions(
                 this,
@@ -62,7 +66,7 @@ class VisionActivity : AppCompatActivity() {
                 imageProxy.close()
             }
 
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
 
             try {
                 cameraProvider.unbindAll()
@@ -73,7 +77,7 @@ class VisionActivity : AppCompatActivity() {
                     imageAnalyzer
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("VisionActivity", "Use case binding failed", e)
             }
         }, ContextCompat.getMainExecutor(this))
     }
@@ -86,9 +90,14 @@ class VisionActivity : AppCompatActivity() {
         bitmap.compress(Bitmap.CompressFormat.JPEG, 70, output)
         val base64 = Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
 
+        // Apenas para teste: confirma no Logcat que os frames estão a ser processados
+        Log.d("VisionActivity", "Frame processado. Tamanho do Base64: ${base64.length}")
+
+        /* Desativado para teste da câmara
         if (::webSocket.isInitialized) {
             webSocket.send(base64) // <- envia frame
         }
+        */
     }
 
     // ------- EXTENSÃO PARA CONVERTER IMAGEPROXY -------
@@ -135,7 +144,7 @@ class VisionActivity : AppCompatActivity() {
         if (requestCode == 10) {
             if (allPermissionsGranted()) {
                 startCamera()
-                connectWebSocket()
+                // connectWebSocket() // Desativado para teste da câmara
             } else {
                 Toast.makeText(this, "Permissions not granted by the user.", Toast.LENGTH_SHORT).show()
                 finish()
@@ -151,8 +160,10 @@ class VisionActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         executor.shutdown()
+        /* Desativado para teste da câmara
         if (::webSocket.isInitialized) {
             webSocket.close(1000, "Activity Destroyed")
         }
+        */
     }
 }
