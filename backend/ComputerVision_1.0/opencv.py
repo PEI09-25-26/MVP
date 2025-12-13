@@ -1,133 +1,152 @@
 import cv2
 import numpy as np
-from src.utils.DistanceHelper import DistanceHelper
-
 
 class CardDetector:
-    """Detector de cartas baseado na estratégia do projCV - foca apenas na detecção de cartas na mesa"""
+    """
+    Detector Final v5: Garante geometria perfeita (Zero Skew/Distorção).
+    Estratégia: Recorta a forma natural (seja landscape ou portrait) e 
+    roda apenas no final.
+    """
     
-    def __init__(self, debug=True, min_area=10000, max_cards=10):
+    def __init__(self, debug=True, min_area=5000, max_cards=10):
         self.debug = debug
-        self.min_area = min_area  # Área mínima para considerar um contorno como carta
-        self.max_cards = max_cards  # Limitar número máximo de cartas a processar
-        self.standard_width = 200
-        self.standard_height = 300
+        self.min_area = min_area
+        self.max_cards = max_cards
+        # Dimensões finais para o YOLO (Sempre Portrait/Em pé)
+        self.card_width = 200
+        self.card_height = 280
 
     def get_thresh(self, img):
-        """Preprocessa a imagem para detecção de bordas"""
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
-        canny = cv2.Canny(blur, 42, 89)
-        kernel = np.ones((2, 2))
-        dial = cv2.dilate(canny, kernel=kernel, iterations=2)
-        return dial
+        thresh = cv2.adaptiveThreshold(blur, 255, 
+                                     cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                     cv2.THRESH_BINARY_INV, 11, 2)
+        kernel = np.ones((3, 3), np.uint8)
+        thresh = cv2.erode(thresh, kernel, iterations=1)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+        return thresh
+
+    def reorder_points_circular(self, pts):
+        """
+        Ordena os pontos [TL, TR, BR, BL] de forma circular.
+        Essencial para evitar que a imagem fique 'baralhada'.
+        """
+        pts = pts.reshape(4, 2)
+        center = np.mean(pts, axis=0)
+        angles = np.arctan2(pts[:, 1] - center[1], pts[:, 0] - center[0])
+        sort_indices = np.argsort(angles)
+        sorted_pts = pts[sort_indices]
+        
+        # Encontrar o ponto Top-Left (menor soma x+y) para ser o primeiro
+        s = sorted_pts.sum(axis=1)
+        tl_idx = np.argmin(s)
+        ordered = np.roll(sorted_pts, -tl_idx, axis=0)
+        
+        return ordered.astype("float32")
 
     def find_corners_set(self, img, original, draw=False):
-        """Encontra os cantos de contornos retangulares (cartas) na imagem"""
-        contours, hier = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        # Processar apenas os maiores contornos (otimização)
+        contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         proper = sorted(contours, key=cv2.contourArea, reverse=True)[:self.max_cards * 2]
         four_corners_set = []
 
         for cnt in proper:
             area = cv2.contourArea(cnt)
-            perimeter = cv2.arcLength(cnt, closed=True)
-
             if area > self.min_area:
-                approx = cv2.approxPolyDP(cnt, 0.01 * perimeter, closed=True)
-                num_corners = len(approx)
+                # Usa minAreaRect para pegar a caixa rodada real
+                rect = cv2.minAreaRect(cnt)
+                (w_real, h_real) = rect[1]
+                
+                if w_real == 0 or h_real == 0: continue
 
-                if num_corners == 4:
-                    x, y, w, h = cv2.boundingRect(approx)
-
+                # Filtro de geometria básica
+                ar = w_real / float(h_real)
+                check_ar = ar if ar >= 1 else 1/ar
+                
+                if 1.1 <= check_ar <= 2.5:
+                    box = cv2.boxPoints(rect)
+                    box = np.int64(box) # Correção para o erro do numpy
+                    
                     if draw:
-                        cv2.rectangle(original, (x, y), (x + w, y + h), (0, 255, 0), 3)
+                        cv2.drawContours(original, [box], 0, (0, 255, 0), 2)
 
-                    # Ordenar os cantos: top left, bot left, bot right, top right
-                    l1 = np.array(approx[0]).tolist()
-                    l2 = np.array(approx[1]).tolist()
-                    l3 = np.array(approx[2]).tolist()
-                    l4 = np.array(approx[3]).tolist()
-
-                    finalOrder = []
-                    sortedX = sorted([l1, l2, l3, l4], key=lambda x: x[0][0])
-
-                    # Metade esquerda
-                    finalOrder.extend(sorted(sortedX[0:2], key=lambda x: x[0][1]))
-
-                    # Metade direita (maior y primeiro)
-                    finalOrder.extend(sorted(sortedX[2:4], key=lambda x: x[0][1], reverse=True))
-
-                    four_corners_set.append(finalOrder)
-
-                    if draw:
-                        for a in approx:
-                            cv2.circle(original, (a[0][0], a[0][1]), 6, (255, 0, 0), 3)
+                    pts = box.reshape(4, 2)
+                    ordered_pts = self.reorder_points_circular(pts)
+                    four_corners_set.append(ordered_pts.reshape(4, 1, 2))
 
         return four_corners_set
 
-    def find_flatten_cards(self, img, set_of_corners, debug=False):
-        """Aplica transformação de perspectiva para achatar/normalizar as cartas"""
+    def find_flatten_cards(self, img, set_of_corners):
         img_outputs = []
+        
+        for corners in set_of_corners:
+            pts = corners.reshape(4, 2)
+            
+            # 1. Medir as dimensões VISUAIS deste contorno específico
+            # Largura (Topo): Distância entre ponto 0 e 1
+            width = np.linalg.norm(pts[0] - pts[1])
+            # Altura (Lado): Distância entre ponto 1 e 2
+            height = np.linalg.norm(pts[1] - pts[2])
 
-        for i, corners in enumerate(set_of_corners):
-            top_left = corners[0][0]
-            bottom_left = corners[1][0]
-            bottom_right = corners[2][0]
-            top_right = corners[3][0]
-
-            widthA = DistanceHelper.euclidean(bottom_right[0], bottom_right[1], bottom_left[0], bottom_left[1])
-            widthB = DistanceHelper.euclidean(top_right[0], top_right[1], top_left[0], top_left[1])
-            heightA = DistanceHelper.euclidean(top_right[0], top_right[1], bottom_right[0], bottom_right[1])
-            heightB = DistanceHelper.euclidean(top_left[0], top_left[1], bottom_left[0], bottom_left[1])
-
-            maxWidth = int(max(widthA, widthB))
-            maxHeight = int(max(heightA, heightB))
-
-            # Determinar orientação
-            if maxWidth > maxHeight:
-                dst_width, dst_height = self.standard_height, self.standard_width
-                rotate90 = True
+            # 2. Decisão Geométrica:
+            # Se a largura visual for maior, o destino TEM de ser Landscape (largo).
+            # Se a altura visual for maior, o destino TEM de ser Portrait (alto).
+            
+            if width > height:
+                # Configurar destino como Landscape (280x200)
+                # Isto "casa" perfeitamente com a carta deitada, sem distorção.
+                dst_w = self.card_height  # 280
+                dst_h = self.card_width   # 200
+                needs_rotation = True     # Marcamos para rodar no fim
             else:
-                dst_width, dst_height = self.standard_width, self.standard_height
-                rotate90 = False
+                # Configurar destino como Portrait (200x280)
+                dst_w = self.card_width   # 200
+                dst_h = self.card_height  # 280
+                needs_rotation = False
 
-            pts1 = np.float32([top_left, bottom_left, bottom_right, top_right])
-            pts2 = np.float32([[0, 0], [0, dst_height], [dst_width, dst_height], [dst_width, 0]])
+            # Pontos de destino perfeitos (sempre começa no 0,0)
+            pts2 = np.array([
+                [0, 0],
+                [dst_w - 1, 0],
+                [dst_w - 1, dst_h - 1],
+                [0, dst_h - 1]
+            ], dtype="float32")
 
-            matrix = cv2.getPerspectiveTransform(pts1, pts2)
-            img_output = cv2.warpPerspective(img, matrix, (dst_width, dst_height))
+            # 3. Transformação de Perspetiva (Warp)
+            matrix = cv2.getPerspectiveTransform(pts, pts2)
+            img_output = cv2.warpPerspective(img, matrix, (dst_w, dst_h))
 
-            # Rodar 90º se necessário
-            if rotate90:
+            # 4. Rotação Final
+            # Se a carta estava deitada, agora que está recortada e limpa,
+            # rodamo-la 90 graus para ficar em pé para o YOLO.
+            if needs_rotation:
                 img_output = cv2.rotate(img_output, cv2.ROTATE_90_CLOCKWISE)
 
+            # 5. Garantia Final de Tamanho
+            # Assegura que sai sempre 200x280, aconteça o que acontecer.
+            img_output = cv2.resize(img_output, (self.card_width, self.card_height))
+            
             img_outputs.append(img_output)
 
         return img_outputs
 
     def detect_cards_from_frame(self, frame):
-        """Método principal para detectar cartas num frame"""
-        # Reduzir resolução para melhor performance
+        # Resize inicial para performance
         scale = 0.75
-        height, width = frame.shape[:2]
-        small_frame = cv2.resize(frame, (int(width * scale), int(height * scale)))
+        h, w = frame.shape[:2]
+        small_frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
         
-        img_result = small_frame.copy() if self.debug else small_frame
-        img_result2 = small_frame.copy()
+        debug_img = small_frame.copy() if self.debug else None
 
-        # 1. Preprocessamento
         thresh = self.get_thresh(small_frame)
-
-        # 2. Encontrar cantos das cartas
-        four_corners_set = self.find_corners_set(thresh, img_result, draw=self.debug)
-
-        # 3. Achatar cartas (limitar ao max_cards)
-        flatten_cards = self.find_flatten_cards(img_result2, four_corners_set[:self.max_cards], debug=False)
-
-        # Retornar cartas achatadas e frame com desenhos (se debug ativo)
-        # Redimensionar img_result de volta ao tamanho original se necessário
-        if self.debug:
-            img_result = cv2.resize(img_result, (width, height))
+        four_corners_set = self.find_corners_set(thresh, debug_img, draw=self.debug)
         
-        return flatten_cards, img_result, four_corners_set
+        # Passar o frame colorido para recorte
+        flatten_cards = self.find_flatten_cards(small_frame, four_corners_set)
+
+        if self.debug:
+            debug_img = cv2.resize(debug_img, (w, h))
+        else:
+            debug_img = frame
+
+        return flatten_cards, debug_img, four_corners_set

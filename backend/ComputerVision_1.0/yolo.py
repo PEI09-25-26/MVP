@@ -18,7 +18,7 @@ class CardClassifier:
             "Qc", "Qd", "Qh", "Qs"
         ]
     
-    def classify(self, img, conf_threshold=0.2):
+    def classify(self, img, conf_threshold=0.5):
         # img: cropped card (numpy array)
         results = self.model(img, conf=conf_threshold, verbose=False)
         boxes = results[0].boxes
