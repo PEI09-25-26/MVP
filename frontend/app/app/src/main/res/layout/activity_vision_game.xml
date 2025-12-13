@@ -31,4 +31,80 @@
         android:rowCount="1"
         android:columnCount="5"
         android:layout_marginTop="12dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Mesa"
+        android:textColor="@android:color/white"
+        android:layout_marginTop="16dp"
+        android:layout_gravity="center_horizontal"/>
+
+    <RelativeLayout
+        android:id="@+id/gameTable"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="12dp">
+
+        <!-- Card NORTH -->
+        <ImageView
+            android:id="@+id/card_north"
+            android:layout_width="60dp"
+            android:layout_height="90dp"
+            android:layout_alignParentTop="true"
+            android:layout_centerHorizontal="true"
+            android:src="@drawable/card_back"
+            android:contentDescription="Carta Norte"/>
+
+        <!-- Trunfo text -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@+id/trump_card"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="8dp"
+            android:text="Trunfo"
+            android:textColor="@android:color/white" />
+
+        <!-- Card WEST -->
+        <ImageView
+            android:id="@+id/card_west"
+            android:layout_width="60dp"
+            android:layout_height="90dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:src="@drawable/card_back"
+            android:contentDescription="Carta Oeste"/>
+
+        <!-- Card EAST -->
+        <ImageView
+            android:id="@+id/card_east"
+            android:layout_width="60dp"
+            android:layout_height="90dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:src="@drawable/card_back"
+            android:contentDescription="Carta Este"/>
+
+        <!-- Card SOUTH -->
+        <ImageView
+            android:id="@+id/card_south"
+            android:layout_width="60dp"
+            android:layout_height="90dp"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:src="@drawable/card_back"
+            android:contentDescription="Carta Sul"/>
+
+        <!-- Trump Card CENTER -->
+        <ImageView
+            android:id="@+id/trump_card"
+            android:layout_width="60dp"
+            android:layout_height="90dp"
+
+            android:layout_centerInParent="true"
+            android:src="@drawable/card_back"
+            android:contentDescription="Trunfo"/>
+    </RelativeLayout>
+
 </LinearLayout>
