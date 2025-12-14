@@ -2,7 +2,6 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
-import base64
 import requests
 import websockets
 import json
@@ -14,7 +13,7 @@ from backend_client import BackendClient
 
 app = FastAPI(title="CV Middleware", version="0.1")
 
-# backend = BackendClient(base_url="http://localhost:8080")
+backend = BackendClient(base_url="http://localhost:8080")
 
 # CV Service URLs
 CV_SERVICE_URL = "http://localhost:8001"
@@ -142,13 +141,12 @@ async def websocket_camera(websocket: WebSocket, game_id: str):
             del cv_connections[game_id]
         print(f"[Middleware] Cleaned up connections for game: {game_id}")
 
+
 @app.post("/scan")
 def receive_scan(event: ScanEventDTO):
     """
     Receives a card detection event and forwards it to the backend.
     """
-
-    # No detection → nothing to do
     if not event.detection:
         return {
             "success": False,
@@ -156,27 +154,14 @@ def receive_scan(event: ScanEventDTO):
             "detection": event.detection.dict() if event.detection else None
         }
 
-    # DTO → domain model
     detection = CardDetection(
         rank=event.detection.rank,
         suit=event.detection.suit,
         confidence=event.detection.confidence
     )
 
-    # --- TESTING: bypass backend ---
-    # Just return a fake backend response to avoid blocking
-    return {
-        "success": True,
-        "message": "card received (backend bypassed)",
-        "backend_response": {"status": "ok", "id": 123},  # dummy data
-        "detection": detection.to_json()
-    }
-
-    """
-    # Send to backend
     backend_response = backend.send_card(detection)
 
-    # Backend unreachable or error
     if backend_response is None:
         return {
             "success": False,
@@ -184,11 +169,9 @@ def receive_scan(event: ScanEventDTO):
             "detection": detection.to_json()
         }
 
-    # Success
     return {
         "success": True,
         "message": "card forwarded",
         "backend_response": backend_response,
         "detection": detection.to_json()
     }
-    """

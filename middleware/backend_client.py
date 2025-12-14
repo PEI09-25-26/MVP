@@ -1,8 +1,6 @@
 import requests
 from typing import Optional
-
 from models import CardDetection
-
 
 class BackendClient:
     def __init__(self, base_url: str):
@@ -19,7 +17,6 @@ class BackendClient:
                 json={
                     "rank": detection.rank,
                     "suit": detection.suit,
-                    "confidence": detection.confidence
                 },
                 timeout=3
             )

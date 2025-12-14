@@ -6,12 +6,13 @@ import cv2
 import os
 import numpy as np
 import requests
+import time
 
 def send_to_middleware(rank: str, suit: str, confidence: float, source="python_cv"):
     """
     Sends the detected card to the Middleware.
     """
-    url = "http://127.0.0.1:8000/scan"
+    url = "http://localhost:8000/scan"
     payload = {
         "source": source,
         "success": True,
@@ -22,11 +23,11 @@ def send_to_middleware(rank: str, suit: str, confidence: float, source="python_c
             "confidence": confidence
         }
     }
+    print(payload)
     try:
-        response = requests.post(url, json=payload, timeout=2)
-        print(f"[Middleware] Response: {response.json()}")
+        requests.post(url, json=payload, timeout=0.1)
     except requests.RequestException as e:
-        print(f"[Middleware] Error sending card: {e}")
+        pass
 
 def parse_label(label: str):
     """
@@ -37,10 +38,10 @@ def parse_label(label: str):
     rank = label[:-1]
     suit_char = label[-1].lower()
     suit_map = {
-        "c": "Clubs",
-        "d": "Diamonds",
-        "h": "Hearts",
-        "s": "Spades"
+        "c": "♣",
+        "d": "♦",
+        "h": "♥",
+        "s": "♠"
     }
     suit = suit_map.get(suit_char, "Unknown")
     return rank, suit
@@ -49,6 +50,7 @@ def parse_label(label: str):
 def main():
     print("Métodos disponíveis: usb, ip, file")
     method = input("Escolha o método de acesso à câmera: ").strip()
+    first_card = True
 
     if method == 'usb':
         cameras = Camera.list_usb_cameras()
@@ -118,9 +120,12 @@ def main():
 
                     if class_label and class_label not in sent_labels:
                         rank, suit = parse_label(class_label)
-                        if rank and suit:
+                        if rank and suit and suit != "Unknown":
                             send_to_middleware(rank, suit, conf)
-                            sent_labels.add(class_label)
+                            if first_card:
+                                first_card = False
+                            else:
+                                sent_labels.add(class_label)
                         else:
                             print(f"[Middleware] Could not parse label: {class_label}")
 

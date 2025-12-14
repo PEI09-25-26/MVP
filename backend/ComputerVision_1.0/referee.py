@@ -1,4 +1,5 @@
 from card_mapper import CardMapper
+from collections import deque
 import random
 
 
@@ -6,11 +7,14 @@ SUITS = ["♣", "♦", "♥", "♠"]
 
 class Referee:
     def __init__(self):
+        self.card_queue = deque()
         self.players = {"player1":[True,True,True,True],
                         "player2":[True,True,True,True],
                         "player3":[True,True,True,True],
                         "player4":[True,True,True,True]
                         }
+        self.trump_set = False
+        self.current_player = 1
         self.trump=None
         self.trump_suit=None
         self.trump_was_played = False
@@ -19,77 +23,73 @@ class Referee:
         self.team2_points = 0
         self.team1_victories = 0
         self.team2_victories = 0
-                
-    def receive_card(self):
-        card = input("card:")
-        return card
-
-    def round(self, first_player):
-        for _ in range(10):
-            if _==0:
-                self.get_trump()
-            for i in range(4):
-                card_number = self.receive_card()
-                self.round_vector.append(card_number)
-                if card_number == self.trump:
-                    self.trump_was_played = True
-                card_suit = CardMapper.get_card_suit(card_number)
-                this_player = i + first_player
-                if this_player%4 != 0:
-                    this_player = this_player%4
-                else :
-                    this_player = 4
-                player = str("player"+str(this_player))
-                card_suit_index = SUITS.index(card_suit)
-                if self.players.get(player)[card_suit_index]== False:
-                    print("RENUNCIA -> A equipa adversária vence 4 jogos!\n")
-                    if this_player%2 ==0:
-                        self.team1_victories +=4
-                    else:
-                        self.team2_victories +=4
-                    return False
-                if i == 0:
-                    round_suit = card_suit
-                    print(player, card_suit, round_suit, "\n")
-                    round_suit_index = SUITS.index(round_suit)
-                elif 0<i<3: 
-                    print(player, card_suit, round_suit, "\n")
-                    if card_suit != round_suit:
-                        print("Já não tenho\n")
-                        self.players[player][round_suit_index]=False
-                else:
-                    print(player, card_suit, round_suit, "\n")
-                    if card_suit != round_suit:
-                        if round_suit == self.trump_suit:
-                            if self.trump_was_played == False:
-                                print("RENUNCIA -> A equipa adversária vence 4 jogos!\n")
-                                if this_player%2 ==0:
-                                    self.team1_victories +=4
-                                else:
-                                    self.team2_victories +=4
-                                return False
-                        print("Já não tenho\n")
-                        self.players[player][round_suit_index]=False
-            winner = self.determine_round_winner(round_suit)
-            self.get_round_sum(winner)
-            self.reset_round()
-            first_player = winner + first_player
-            if first_player%4!=0:
-                first_player = first_player%4
-            else:
-                first_player = 4
-        self.get_game_winner()
-        return True
     
-    def game(self):
-        while True:
-            for i in range(4):
-                first_player = i+1
-                self.reset_players()
-                self.round(first_player)
-                print(f"Score: Team 1 - {self.team1_victories} | Team 2 - {self.team2_victories}\n")
+    def state(self):
+        return {
+            "trump_set": self.trump_set,
+            "trump": CardMapper.get_card(self.trump) if self.trump else None,
+            "queue_size": len(self.card_queue),
+            "current_player": self.current_player,
+            "team1_points": self.team1_points,
+            "team2_points": self.team2_points,
+            "team1_victories": self.team1_victories,
+            "team2_victories": self.team2_victories
+        }
 
+    def receive_card(self):
+        if not self.card_queue:
+            raise RuntimeError("No card available")
+        return self.card_queue.popleft()
 
+    def inject_card(self, card_id: int):
+        self.card_queue.append(card_id)
+
+    def set_trump(self):
+        self.trump = self.receive_card()
+        self.trump_suit = CardMapper.get_card_suit(self.trump)
+        self.trump_set = True
+        print(f"Trump set to {CardMapper.get_card(self.trump)}")
+
+    def play_round(self):
+        if len(self.card_queue) < 4:
+            return False
+        for i in range(4):
+            card_number = self.receive_card()
+            self.round_vector.append(card_number)
+
+            if card_number == self.trump:
+                self.trump_was_played = True
+
+            card_suit = CardMapper.get_card_suit(card_number)
+            this_player = self.current_player + i
+            this_player = ((this_player - 1) % 4) + 1
+            player = f"player{this_player}"
+
+            card_suit_index = SUITS.index(card_suit)
+
+            if not self.players[player][card_suit_index]:
+                print("[RENUNCIA] AN ILLEGAL PLAY HAS BEEN MADE!!")
+                if this_player % 2 == 0:
+                    self.team1_victories += 4
+                else:
+                    self.team2_victories += 4
+                self.reset_round()
+                return False
+
+            if i == 0:
+                round_suit = card_suit
+                round_suit_index = SUITS.index(round_suit)
+            else:
+                if card_suit != round_suit:
+                    self.players[player][round_suit_index] = False
+
+        winner = self.determine_round_winner(round_suit)
+        self.get_round_sum(winner)
+
+        self.current_player = ((self.current_player + winner - 1) % 4) + 1
+
+        self.reset_round()
+        return True
 
     def reset_players(self):
         self.players = {"player1":[True,True,True,True],
@@ -105,6 +105,7 @@ class Referee:
 
     def reset_round(self):
         self.round_vector = []
+        self.trump_was_played = False
         
     def get_trump(self):
         self.trump = self.receive_card()
@@ -152,7 +153,3 @@ class Referee:
             else:
                 self.team2_victories += 4
                 print("Team 2 wins the game and team 1 made no points (Team 2 +4 victories)!")
-
-
-r = Referee()
-r.game()
