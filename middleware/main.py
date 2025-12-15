@@ -6,9 +6,11 @@ import requests
 import websockets
 import json
 import threading
+import subprocess
 
 from models import CardDetection, ScanEvent
 from backend_client import BackendClient
+from qrcode_generator import generate_qr_code
 
 # ---------- App ----------
 
@@ -20,6 +22,12 @@ backend = BackendClient(base_url="http://localhost:8002")
 CV_SERVICE_URL = "http://localhost:8001"
 CV_SERVICE_WS_URL = "ws://localhost:8001"
 GAME_SERVICE_URL = "http://localhost:8002"
+
+#Device url
+DEVICE_SERVICE_URL = subprocess.getoutput("ip route get 1.1.1.1 | awk '{print $7}'")
+
+#Device url as QR code
+generate_qr_code(f"http://{DEVICE_SERVICE_URL}:8000")
 
 # Active WebSocket connections
 active_connections: dict[str, WebSocket] = {}
