@@ -16,6 +16,7 @@ MIDDLEWARE_ROUND_END_URL = "http://localhost:8000/game/round_end"
 MAX_ROUNDS = 4  # 4 rondas por jogo
 MAX_RODADAS = 10  # 10 rodadas por ronda
 current_round = 1  # Ronda atual (1-4)
+current_hand = 0
 
 class CardDTO(BaseModel):
     rank: str
@@ -87,7 +88,10 @@ def receive_card(card: CardDTO):
             "message": "Trump card set"
         }
 
+    current_hand += 1
+
     if len(ref.card_queue) >= 4:
+        current_hand = 0
         print("[DEBUG] Enough cards for a round, playing round...")
         round_ok = ref.play_round()
         print(f"[REFEREE] Round played. Team 1 points: {ref.team1_points}, Team 2 points: {ref.team2_points}")
@@ -158,5 +162,6 @@ def receive_card(card: CardDTO):
     return {
         "success": True,
         "message": "Card queued",
+        "current_player": current_hand,
         "queue_size": len(ref.card_queue)
     }
