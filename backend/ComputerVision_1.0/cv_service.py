@@ -104,15 +104,13 @@ async def start_cv_service(request: StartCVRequest):
         
         # Find YOLO model
         model_path = None
-        runs_path = "./runs/detect/"
+        runs_path = "./runs/classify/sueca_cards_classifier/weights/best.pt"
         if os.path.exists(runs_path):
-            train_folders = [f for f in os.listdir(runs_path) if f.startswith('train')]
-            if train_folders:
-                latest_train = sorted(train_folders, key=lambda x: int(x.replace('train', '') or '0'))[-1]
-                model_path = os.path.join(runs_path, latest_train, 'weights', 'best.pt')
-                print(f"[CV Service] YOLO model found: {model_path}")
-        
-        if model_path and os.path.exists(model_path):
+            model_path = runs_path
+            print(f"[CV Service] YOLO model found: {model_path}")
+
+        # Initialize classifier if model found
+        if model_path is not None and os.path.exists(model_path):
             classifier = CardClassifier(model_path=model_path)
             print("[CV Service] Classifier initialized successfully")
         else:
