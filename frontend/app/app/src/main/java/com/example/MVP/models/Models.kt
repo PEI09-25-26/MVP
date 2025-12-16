@@ -34,16 +34,3 @@ data class CreateRoomResponse(val success: Boolean, val playerId: String, val ro
 
 data class StartGameRequest(val playerName: String, val roomId: String?)
 data class StartGameResponse(val success: Boolean, val message: String, val gameId: String)
-
-// Bot models
-data class BotResponse(val success: Boolean, val message: String? = null)
-data class BotsListResponse(val bots: List<Int>)
-data class BotRecognitionRequest(val bots: List<Int>)
-data class BotPlayResponse(
-    val success: Boolean,
-    val card_id: Int? = null,
-    val card_name: String? = null,
-    val card_index: Int? = null,
-    val player_id: Int? = null,
-    val message: String? = null
-)
