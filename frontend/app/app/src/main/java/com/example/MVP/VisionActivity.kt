@@ -32,7 +32,7 @@ class VisionActivity : AppCompatActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var webSocket: WebSocket
 
-    private val wsUrl = "ws://10.196.16.35:8000/ws/camera/"  // IP do Mac na rede local
+    private val wsUrl = "ws://192.168.176.252:8000/ws/camera/"  // IP do Mac na rede local
     // For emulator use: "ws://10.0.2.2:8000/ws/camera/"
 
     private var gameId: String = "default"
@@ -92,8 +92,6 @@ class VisionActivity : AppCompatActivity() {
             cardSouth = findViewById(R.id.card_south)
             trumpCard = findViewById(R.id.trump_card)
 
-            // Hardcoded card display for testing purposes
-            testCardDisplay()
 
             if (allPermissionsGranted()) {
                 startCamera()
@@ -245,8 +243,6 @@ class VisionActivity : AppCompatActivity() {
         updateCardView("spades_queen", cardSouth)
         updateCardView("spades_ace", trumpCard)
 
-        // Start the 5-second timer to reset the cards
-        startResetTimer()
     }
 
     // ------------------ WEBSOCKET ---------------------
@@ -279,10 +275,7 @@ class VisionActivity : AppCompatActivity() {
                     } catch (e: Exception) {
                         // Não é JSON, tratar como mensagem de carta normal
                     }
-                    
-                    if (text != lastWebSocketMessage) {
-                        // When a new card arrives, cancel the timer and reset the board
-                    }
+
                     lastWebSocketMessage = text
 
                     Toast.makeText(this@VisionActivity, "Card: $text", Toast.LENGTH_SHORT).show()
@@ -312,21 +305,26 @@ class VisionActivity : AppCompatActivity() {
                     val cardIdentifier = "${suit}_$rank"
 
                     Toast.makeText(this@VisionActivity, "Card: $cardIdentifier", Toast.LENGTH_SHORT).show()
-
-                    Log.d("VisionActivity", "Updating South view with card: $cardIdentifier")
-
-                    val  state= json.optString("game_state", "{}")
+                    val state = json.optString("game_state", "{}")
                     val game_state = JSONObject(state)
+                    val message = game_state.optString("message", "{}")
+                    if (message == "Trump card set"){
+                        Toast.makeText(this@VisionActivity, "Trump card set", Toast.LENGTH_SHORT).show()
+                        updateCardView(cardIdentifier, trumpCard)
+                    }
                     val player = game_state.optString("current_player", "")
+                    val queue_size = game_state.optString("queue_size", "{}")
+                    if (queue_size == "1"){
+                        resetCardsToBack()
+                    }
 
                     when (player) {
                         "1" -> {
-                            resetCardsToBack()
                             updateCardView(cardIdentifier, cardNorth)
                         }
                         "2" -> updateCardView(cardIdentifier, cardWest)
                         "3" -> updateCardView(cardIdentifier, cardSouth)
-                        "4" -> updateCardView(cardIdentifier, cardEast)
+                        "0" -> updateCardView(cardIdentifier, cardEast)
                         else -> {
                             // Opcional: caso o valor não seja 1-4
                             println("Jogador desconhecido: $player")
