@@ -8,6 +8,9 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import android.util.Base64
@@ -22,6 +25,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import okhttp3.*
 import com.example.MVP.network.RetrofitClient
+import com.example.MVP.models.BotRecognitionRequest
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 import androidx.appcompat.app.AlertDialog
@@ -32,7 +36,7 @@ class VisionActivity : AppCompatActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var webSocket: WebSocket
 
-    private val wsUrl = "ws://10.196.16.35:8000/ws/camera/"  // IP do Mac na rede local
+    private val wsUrl = "ws://10.56.5.35:8000/ws/camera/"  // IP do Mac na rede local
     // For emulator use: "ws://10.0.2.2:8000/ws/camera/"
 
     private var gameId: String = "default"
@@ -43,6 +47,14 @@ class VisionActivity : AppCompatActivity() {
     private lateinit var cardEast: ImageView
     private lateinit var cardSouth: ImageView
     private lateinit var trumpCard: ImageView
+
+    // Bot cards views
+    private lateinit var botCardsSection: LinearLayout
+    private lateinit var txtBotStatus: TextView
+    private lateinit var botCardViews: Array<ImageView>
+    private lateinit var btnShowBotCards: Button
+    private var hasBots: Boolean = false
+    private var activeBotIds: List<Int> = emptyList()
 
     // Handler for delayed card reset
     private val handler = Handler(Looper.getMainLooper())
@@ -57,8 +69,26 @@ class VisionActivity : AppCompatActivity() {
 
             val btnBack = findViewById<ImageView>(R.id.backButton)
             val btnStartGame = findViewById<Button>(R.id.btnStartGame)
+            btnShowBotCards = findViewById(R.id.btnShowBotCards)
 
             btnBack.setOnClickListener { finish() }
+            
+            btnShowBotCards.setOnClickListener {
+                // Iniciar reconhecimento de cartas do bot
+                lifecycleScope.launch {
+                    try {
+                        val request = BotRecognitionRequest(bots = activeBotIds)
+                        val response = RetrofitClient.api.startBotRecognition(request)
+                        if (response.success) {
+                            btnShowBotCards.visibility = View.GONE
+                            Toast.makeText(this@VisionActivity, "🔍 Mostre as 10 cartas ao bot uma a uma", Toast.LENGTH_LONG).show()
+                        }
+                    } catch (e: Exception) {
+                        Log.e("VisionActivity", "Error starting bot recognition", e)
+                        Toast.makeText(this@VisionActivity, "Erro: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
             
             btnStartGame.setOnClickListener {
                 lifecycleScope.launch {
@@ -91,6 +121,25 @@ class VisionActivity : AppCompatActivity() {
             cardEast = findViewById(R.id.card_east)
             cardSouth = findViewById(R.id.card_south)
             trumpCard = findViewById(R.id.trump_card)
+
+            // Initialize bot cards section
+            botCardsSection = findViewById(R.id.botCardsSection)
+            txtBotStatus = findViewById(R.id.txtBotStatus)
+            botCardViews = arrayOf(
+                findViewById(R.id.botCard1),
+                findViewById(R.id.botCard2),
+                findViewById(R.id.botCard3),
+                findViewById(R.id.botCard4),
+                findViewById(R.id.botCard5),
+                findViewById(R.id.botCard6),
+                findViewById(R.id.botCard7),
+                findViewById(R.id.botCard8),
+                findViewById(R.id.botCard9),
+                findViewById(R.id.botCard10)
+            )
+
+            // Check if there are bots
+            checkForBots()
 
             // Hardcoded card display for testing purposes
             testCardDisplay()
@@ -271,10 +320,56 @@ class VisionActivity : AppCompatActivity() {
                     // Tentar parsear como JSON para detectar mensagens especiais
                     try {
                         val json = JSONObject(text)
-                        if (json.has("type") && json.getString("type") == "round_end") {
-                            // Fim de ronda
-                            handleRoundEnd(json)
-                            return@runOnUiThread
+                        when (json.optString("type")) {
+                            "round_end" -> {
+                                handleRoundEnd(json)
+                                return@runOnUiThread
+                            }
+                            "bot_added" -> {
+                                val playerId = json.getInt("player_id")
+                                Toast.makeText(this@VisionActivity, "🤖 Bot adicionado: Jogador $playerId", Toast.LENGTH_SHORT).show()
+                                hasBots = true
+                                botCardsSection.visibility = View.VISIBLE
+                                return@runOnUiThread
+                            }
+                            "bot_cards_dealt" -> {
+                                // Guardar IDs dos bots e mostrar botão para iniciar reconhecimento
+                                val botsData = json.getJSONObject("bots")
+                                val botsList = mutableListOf<Int>()
+                                val keys = botsData.keys()
+                                while (keys.hasNext()) {
+                                    botsList.add(keys.next().toInt())
+                                }
+                                activeBotIds = botsList
+                                
+                                txtBotStatus.text = "🃏 Trunfo definido! Retire a carta e clique no botão abaixo"
+                                btnShowBotCards.visibility = View.VISIBLE
+                                botCardsSection.visibility = View.VISIBLE
+                                
+                                Toast.makeText(
+                                    this@VisionActivity,
+                                    "🃏 Retire o trunfo da câmara e clique '🤖 Mostrar cartas ao bot'",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                return@runOnUiThread
+                            }
+                            "bot_played" -> {
+                                val playerId = json.getInt("player_id")
+                                val cardName = json.getString("card_name")
+                                val cardIndex = json.getInt("card_index")
+                                handleBotPlayed(playerId, cardName, cardIndex)
+                                return@runOnUiThread
+                            }
+                            "bot_recognition_start" -> {
+                                handleBotRecognitionStart()
+                                return@runOnUiThread
+                            }
+                            "bot_card_recognized" -> {
+                                val cardNumber = json.getInt("card_number")
+                                val cardId = json.getString("card_id")
+                                handleBotCardRecognized(cardNumber, cardId)
+                                return@runOnUiThread
+                            }
                         }
                     } catch (e: Exception) {
                         // Não é JSON, tratar como mensagem de carta normal
@@ -403,6 +498,109 @@ class VisionActivity : AppCompatActivity() {
         // Close WebSocket connection
         if (::webSocket.isInitialized) {
             webSocket.close(1000, "Activity Destroyed")
+        }
+    }
+
+    // ========== BOT FUNCTIONS ==========
+
+    private fun checkForBots() {
+        lifecycleScope.launch {
+            try {
+                val response = RetrofitClient.api.getBots()
+                val bots = response.bots
+                if (bots.isNotEmpty()) {
+                    hasBots = true
+                    botCardsSection.visibility = View.VISIBLE
+                    txtBotStatus.text = "🤖 Bot ativo: Jogador ${bots.first()}"
+                }
+            } catch (e: Exception) {
+                Log.e("VisionActivity", "Error checking bots", e)
+            }
+        }
+    }
+
+    private fun handleBotRecognitionStart() {
+        txtBotStatus.text = "🔍 Reconhecendo cartas do bot..."
+        // Show all 10 cards face down for recognition
+        showBotCards()
+        Toast.makeText(this, "🔍 Mostre as cartas ao bot uma a uma", Toast.LENGTH_LONG).show()
+    }
+
+    private fun handleBotCardRecognized(cardNumber: Int, cardId: String) {
+        if (cardNumber in 1..10) {
+            // Show the card with its number overlay
+            val cardView = botCardViews[cardNumber - 1]
+            updateCardView(cardId, cardView)
+            
+            // You could add a TextView overlay with the number here
+            // For now, show it in a toast
+            Toast.makeText(
+                this,
+                "✅ Carta $cardNumber reconhecida: $cardId",
+                Toast.LENGTH_SHORT
+            ).show()
+            
+            txtBotStatus.text = "✅ $cardNumber/10 cartas reconhecidas"
+            
+            // If all 10 cards are recognized, show completion message
+            if (cardNumber == 10) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    txtBotStatus.text = "✅ Todas as cartas reconhecidas! Pronto para começar"
+                    Toast.makeText(
+                        this,
+                        "✅ Bot pronto! Clique em 'Começar Jogo'",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }, 500)
+            }
+        }
+    }
+
+    private fun showBotCards() {
+        botCardsSection.visibility = View.VISIBLE
+        // Show all 10 cards face down
+        for (cardView in botCardViews) {
+            cardView.setImageResource(R.drawable.card_back)
+            cardView.visibility = View.VISIBLE
+        }
+        txtBotStatus.text = "🎴 Bot tem 10 cartas"
+    }
+
+    private fun handleBotPlayed(playerId: Int, cardName: String, cardIndex: Int) {
+        // Show toast with bot's play
+        Toast.makeText(
+            this,
+            "🤖 Bot $playerId jogou carta $cardIndex: $cardName",
+            Toast.LENGTH_LONG
+        ).show()
+        
+        txtBotStatus.text = "🤖 Bot jogou: $cardName"
+        
+        // Hide the card that was played (cardIndex is 1-10)
+        if (cardIndex in 1..10) {
+            botCardViews[cardIndex - 1].visibility = View.INVISIBLE
+        }
+        
+        // Update remaining cards count
+        val remainingCards = botCardViews.count { it.visibility == View.VISIBLE }
+        if (remainingCards > 0) {
+            txtBotStatus.text = "🤖 Bot tem $remainingCards cartas restantes"
+        } else {
+            txtBotStatus.text = "🤖 Bot jogou todas as cartas"
+        }
+    }
+
+    private fun dealCardsToBot() {
+        lifecycleScope.launch {
+            try {
+                val response = RetrofitClient.api.dealBotCards()
+                if (response.success) {
+                    showBotCards()
+                    Toast.makeText(this@VisionActivity, "Cartas distribuídas ao bot", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("VisionActivity", "Error dealing cards to bot", e)
+            }
         }
     }
 }

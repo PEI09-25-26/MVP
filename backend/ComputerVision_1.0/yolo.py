@@ -21,5 +21,6 @@ class CardClassifier:
         if results and len(results) > 0:
             class_label = results[0].names[results[0].probs.top1]
             conf = results[0].probs.top1conf.item()
-            return class_label, conf
+            if conf >= 0.95:
+                return class_label, conf
         return None, 0.0

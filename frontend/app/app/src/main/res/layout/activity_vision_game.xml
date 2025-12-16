@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:background="@drawable/background_gradient"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@drawable/background_gradient">
+
+<LinearLayout
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:padding="12dp">
 
     <ImageView
@@ -15,7 +19,7 @@
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="match_parent"
-        android:layout_height="300dp"/>
+        android:layout_height="200dp"/>
 
     <Button
         android:id="@+id/btnStartGame"
@@ -27,20 +31,125 @@
         android:textColor="@android:color/white"
         android:layout_marginTop="8dp"/>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Mão de cartas"
-        android:textColor="@android:color/white"
-        android:layout_marginTop="12dp"/>
-
-    <GridLayout
-        android:id="@+id/playerHand"
+    <Button
+        android:id="@+id/btnShowBotCards"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:rowCount="1"
-        android:columnCount="5"
-        android:layout_marginTop="12dp"/>
+        android:text="🤖 Mostrar cartas ao bot"
+        android:textAllCaps="false"
+        android:background="@color/purple_500"
+        android:textColor="@android:color/white"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"/>
+
+    <!-- Bot Cards Section -->
+    <LinearLayout
+        android:id="@+id/botCardsSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:layout_marginTop="12dp">
+
+        <TextView
+            android:id="@+id/txtBotLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🤖 Cartas do Bot"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"/>
+
+        <!-- Row 1: Cards 1-5 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="8dp">
+
+            <ImageView
+                android:id="@+id/botCard1"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+            <ImageView
+                android:id="@+id/botCard2"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+            <ImageView
+                android:id="@+id/botCard3"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+            <ImageView
+                android:id="@+id/botCard4"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+            <ImageView
+                android:id="@+id/botCard5"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+        </LinearLayout>
+
+        <!-- Row 2: Cards 6-10 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="4dp">
+
+            <ImageView
+                android:id="@+id/botCard6"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+            <ImageView
+                android:id="@+id/botCard7"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+            <ImageView
+                android:id="@+id/botCard8"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+            <ImageView
+                android:id="@+id/botCard9"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+            <ImageView
+                android:id="@+id/botCard10"
+                android:layout_width="50dp"
+                android:layout_height="75dp"
+                android:layout_margin="2dp"
+                android:src="@drawable/card_back"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/txtBotStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text=""
+            android:textColor="#FFEB3B"
+            android:textSize="14sp"
+            android:layout_marginTop="8dp"/>
+    </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
@@ -118,3 +227,4 @@
     </RelativeLayout>
 
 </LinearLayout>
+</ScrollView>

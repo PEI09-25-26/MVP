@@ -31,5 +31,27 @@ interface ApiService {
     @POST("game/new_round/{gameId}")
     suspend fun startNewRound(@Path("gameId") gameId: String): StartGameResponse
 
+    // Bot endpoints
+    @POST("game/add_bot/{playerId}")
+    suspend fun addBot(@Path("playerId") playerId: Int): BotResponse
+    
+    @DELETE("game/remove_bot/{playerId}")
+    suspend fun removeBot(@Path("playerId") playerId: Int): BotResponse
+    
+    @GET("game/bots")
+    suspend fun getBots(): BotsListResponse
+    
+    @POST("game/deal_bot_cards")
+    suspend fun dealBotCards(): BotResponse
+    
+    @POST("game/bot_recognition_start")
+    suspend fun startBotRecognition(@Body request: BotRecognitionRequest): BotResponse
+    
+    @POST("game/bot_play/{playerId}")
+    suspend fun requestBotPlay(
+        @Path("playerId") playerId: Int,
+        @Query("round_suit") roundSuit: String? = null
+    ): BotPlayResponse
+
     //get de arbitragem
 }

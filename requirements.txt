@@ -11,3 +11,4 @@ opencv-python
 ultralytics
 pillow
 threading
+qrcode

@@ -120,7 +120,10 @@ async def start_cv_service(request: StartCVRequest):
         # Track this game
         active_games[request.game_id] = {
             "last_labels": {},
-            "sent_labels": set()
+            "sent_labels": set(),
+            "bot_recognition_mode": False,
+            "bot_recognized_count": 0,
+            "bot_player_id": None
         }
         
         return {
@@ -153,7 +156,10 @@ async def cv_stream(websocket: WebSocket, game_id: str):
     if game_id not in active_games:
         active_games[game_id] = {
             "last_labels": {},
-            "sent_labels": set()
+            "sent_labels": set(),
+            "bot_recognition_mode": False,
+            "bot_recognized_count": 0,
+            "bot_player_id": None
         }
     
     game_state = active_games[game_id]
@@ -172,7 +178,9 @@ async def cv_stream(websocket: WebSocket, game_id: str):
                 # It's a command
                 try:
                     command = json.loads(message)
-                    if command.get("action") == "reset_cards":
+                    action = command.get("action")
+                    
+                    if action == "reset_cards":
                         print(f"[CV Service] 🔄 Received reset command - clearing card history")
                         sent_labels.clear()
                         last_labels.clear()
@@ -181,6 +189,35 @@ async def cv_stream(websocket: WebSocket, game_id: str):
                             "message": "cards_reset"
                         })
                         continue
+                    
+                    elif action == "start_bot_recognition":
+                        player_id = command.get("player_id")
+                        print(f"[CV Service] 🤖 Starting bot recognition mode for player {player_id}")
+                        print(f"[CV Service] 🔄 Clearing card history (sent: {len(sent_labels)}, last: {len(last_labels)})")
+                        game_state["bot_recognition_mode"] = True
+                        game_state["bot_recognized_count"] = 0
+                        game_state["bot_player_id"] = player_id
+                        sent_labels.clear()  # Clear previous detections
+                        last_labels.clear()  # Clear last detection history
+                        print(f"[CV Service] ✅ Card history cleared - ready for bot recognition")
+                        await websocket.send_json({
+                            "success": True,
+                            "message": "bot_recognition_started"
+                        })
+                        continue
+                    
+                    elif action == "stop_bot_recognition":
+                        print(f"[CV Service] 🤖 Stopping bot recognition mode")
+                        game_state["bot_recognition_mode"] = False
+                        game_state["bot_recognized_count"] = 0
+                        game_state["bot_player_id"] = None
+                        sent_labels.clear()
+                        await websocket.send_json({
+                            "success": True,
+                            "message": "bot_recognition_stopped"
+                        })
+                        continue
+                        
                 except json.JSONDecodeError:
                     pass  # Not a valid JSON, treat as frame
             
@@ -207,23 +244,68 @@ async def cv_stream(websocket: WebSocket, game_id: str):
                         print(f"[CV Service] Card {i}: {label_str}")
                         last_labels[i] = label_str
                         
-                        # Only report new detections
-                        if class_label not in sent_labels:
-                            rank, suit = parse_label(class_label)
-                            if rank and suit:
-                                # Send detection back to middleware
-                                detection = {
-                                    "rank": rank,
-                                    "suit": suit,
-                                    "confidence": conf,
-                                    "position": i
-                                }
-                                await websocket.send_json({
-                                    "success": True,
-                                    "detection": detection
-                                })
-                                sent_labels.add(class_label)
-                                print(f"[CV Service] ✓ New card detected: {rank} of {suit} (confidence: {conf:.2%})")
+                        # Check if we're in bot recognition mode
+                        if game_state.get("bot_recognition_mode", False):
+                            # Only detect new cards for bot (up to 10)
+                            if class_label not in sent_labels and game_state["bot_recognized_count"] < 10:
+                                rank, suit = parse_label(class_label)
+                                if rank and suit:
+                                    game_state["bot_recognized_count"] += 1
+                                    card_number = game_state["bot_recognized_count"]
+                                    
+                                    # Map to card_id format (e.g., "clubs_2", "clubs_ace", "clubs_jack")
+                                    suit_lower = suit.lower()
+                                    # Converter rank para formato de nome de arquivo
+                                    rank_map = {
+                                        "Q": "queen",
+                                        "J": "jack", 
+                                        "K": "king",
+                                        "A": "ace"
+                                    }
+                                    rank_name = rank_map.get(rank, rank.lower())
+                                    card_id = f"{suit_lower}_{rank_name}"
+                                    
+                                    detection = {
+                                        "type": "bot_card_recognized",
+                                        "card_number": card_number,
+                                        "card_id": card_id,
+                                        "rank": rank,
+                                        "suit": suit,
+                                        "confidence": conf,
+                                        "player_id": game_state["bot_player_id"]
+                                    }
+                                    
+                                    await websocket.send_json(detection)
+                                    sent_labels.add(class_label)
+                                    
+                                    print(f"[CV Service] 🤖 Bot card {card_number}/10 recognized: {card_id} (conf: {conf:.2%})")
+                                    
+                                    # If all 10 cards recognized, stop recognition mode
+                                    if card_number == 10:
+                                        print(f"[CV Service] 🤖 All 10 bot cards recognized!")
+                                        await websocket.send_json({
+                                            "type": "bot_recognition_complete",
+                                            "player_id": game_state["bot_player_id"]
+                                        })
+                                        game_state["bot_recognition_mode"] = False
+                        else:
+                            # Normal game mode - only report new detections
+                            if class_label not in sent_labels:
+                                rank, suit = parse_label(class_label)
+                                if rank and suit:
+                                    # Send detection back to middleware
+                                    detection = {
+                                        "rank": rank,
+                                        "suit": suit,
+                                        "confidence": conf,
+                                        "position": i
+                                    }
+                                    await websocket.send_json({
+                                        "success": True,
+                                        "detection": detection
+                                    })
+                                    sent_labels.add(class_label)
+                                    print(f"[CV Service] ✓ New card detected: {rank} of {suit} (confidence: {conf:.2%})")
             
             # Log progress every 30 frames
             if frame_count % 30 == 0:
