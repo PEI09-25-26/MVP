@@ -154,7 +154,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Mesa"
+        android:text="Norte"
         android:textColor="@android:color/white"
         android:layout_marginTop="16dp"
         android:layout_gravity="center_horizontal"/>
@@ -164,6 +164,48 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginTop="12dp">
+
+        <TextView
+            android:id="@+id/scoreText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pontuação:"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/scoreNorth"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/scoreText"
+            android:text="Norte + sul:"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/scoreNorthText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/scoreText"
+            android:layout_toRightOf="@+id/scoreNorth"
+            android:text="  0"
+            android:textColor="@color/white"
+            />
+        <TextView
+            android:id="@+id/scoreEast"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/scoreNorth"
+            android:text="Este + Oeste:"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/scoreEastText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/scoreNorth"
+            android:layout_toRightOf="@+id/scoreEast"
+            android:text="  0"
+            android:textColor="@color/white"
+            />
 
         <!-- Card NORTH -->
         <ImageView
@@ -195,6 +237,15 @@
             android:src="@drawable/card_back"
             android:contentDescription="Carta Oeste"/>
 
+        <!-- West text -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@+id/card_west"
+            android:layout_marginBottom="8dp"
+            android:text="Oeste"
+            android:textColor="@android:color/white" />
+
         <!-- Card EAST -->
         <ImageView
             android:id="@+id/card_east"
@@ -205,6 +256,16 @@
             android:src="@drawable/card_back"
             android:contentDescription="Carta Este"/>
 
+        <!-- East text -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@+id/card_east"
+            android:layout_alignParentEnd="true"
+            android:layout_marginBottom="8dp"
+            android:text="Este"
+            android:textColor="@android:color/white" />
+
         <!-- Card SOUTH -->
         <ImageView
             android:id="@+id/card_south"
@@ -214,6 +275,16 @@
             android:layout_centerHorizontal="true"
             android:src="@drawable/card_back"
             android:contentDescription="Carta Sul"/>
+
+        <!-- Sul text -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@+id/card_south"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="8dp"
+            android:text="Sul"
+            android:textColor="@android:color/white" />
 
         <!-- Trump Card CENTER -->
         <ImageView

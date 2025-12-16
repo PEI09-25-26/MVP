@@ -11,7 +11,7 @@ import subprocess
 from models import CardDetection, ScanEvent
 from backend_client import BackendClient
 from frontend_client import FrontendClient
-from qrcode_generator import generate_qr_code
+#from qrcode_generator import generate_qr_code
 
 # ---------- App ----------
 

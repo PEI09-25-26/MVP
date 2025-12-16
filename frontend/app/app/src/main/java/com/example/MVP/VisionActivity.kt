@@ -377,12 +377,56 @@ class VisionActivity : AppCompatActivity() {
                     
                     if (text != lastWebSocketMessage) {
                         // When a new card arrives, cancel the timer and reset the board
-                        cancelResetTimer()
-                        resetCardsToBack()
                     }
                     lastWebSocketMessage = text
 
                     Toast.makeText(this@VisionActivity, "Card: $text", Toast.LENGTH_SHORT).show()
+
+                    val json = JSONObject(text)
+
+                    val detectionjson = json.optString("detection", "{}")
+                    val detection = JSONObject(detectionjson)
+
+                    val rankjson = detection.optString("rank", "").lowercase()
+                    Toast.makeText(this@VisionActivity, "Rank: $rankjson", Toast.LENGTH_SHORT).show()
+                    val suit = detection.optString("suit", "").lowercase()
+                    Toast.makeText(this@VisionActivity, "Suit: $suit", Toast.LENGTH_SHORT).show()
+
+
+                    if (rankjson.isEmpty() || suit.isEmpty()) {
+                        Log.w("VisionActivity", "Incomplete card detection data.")
+                    }
+
+                    val rank = when (rankjson) {
+                        "k" -> "king"
+                        "q" -> "queen"
+                        "j" -> "jack"
+                        else -> rankjson
+                    }
+
+                    val cardIdentifier = "${suit}_$rank"
+
+                    Toast.makeText(this@VisionActivity, "Card: $cardIdentifier", Toast.LENGTH_SHORT).show()
+
+                    Log.d("VisionActivity", "Updating South view with card: $cardIdentifier")
+
+                    val  state= json.optString("game_state", "{}")
+                    val game_state = JSONObject(state)
+                    val player = game_state.optString("current_player", "")
+
+                    when (player) {
+                        "1" -> {
+                            resetCardsToBack()
+                            updateCardView(cardIdentifier, cardNorth)
+                        }
+                        "2" -> updateCardView(cardIdentifier, cardWest)
+                        "3" -> updateCardView(cardIdentifier, cardSouth)
+                        "4" -> updateCardView(cardIdentifier, cardEast)
+                        else -> {
+                            // Opcional: caso o valor não seja 1-4
+                            println("Jogador desconhecido: $player")
+                        }
+                    }
                 }
             }
 
