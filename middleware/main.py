@@ -18,7 +18,7 @@ from frontend_client import FrontendClient
 app = FastAPI(title="CV Middleware", version="0.1")
 
 backend = BackendClient(base_url="http://localhost:8002")
-frontend = FrontendClient(base_url="http://localhost:8003")
+frontend = FrontendClient(base_url="http://localhost:8000")
 
 latest_state: dict = {}
 
@@ -31,7 +31,7 @@ GAME_SERVICE_URL = "http://localhost:8002"
 DEVICE_SERVICE_URL = subprocess.getoutput("ip route get 1.1.1.1 | awk '{print $7}'")
 
 #Device url as QR code
-generate_qr_code(f"http://{DEVICE_SERVICE_URL}:8000")
+#generate_qr_code(f"http://{DEVICE_SERVICE_URL}:8000")
 
 # Active WebSocket connections
 active_connections: dict[str, WebSocket] = {}
@@ -251,7 +251,6 @@ async def websocket_camera(websocket: WebSocket, game_id: str):
                                 # Check if trump was just set
                                 if game_result.get("message") == "Trump card set":
                                     print(f"[Middleware] 🃏 Trump set! Waiting for player to start game...")
-                                
                                 # Forward both CV detection and game state to mobile
                                 combined_data = {
                                     "success": True,

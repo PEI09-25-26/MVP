@@ -103,7 +103,7 @@ class Referee:
         winner = self.determine_round_winner(round_suit)
         self.get_round_sum(winner)
 
-        self.current_player = ((self.current_player + winner - 1) % 4) + 1
+        self.current_player = winner+1
 
         self.reset_round()
         return True

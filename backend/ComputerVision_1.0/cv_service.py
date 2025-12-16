@@ -228,7 +228,6 @@ async def cv_stream(websocket: WebSocket, game_id: str):
             # Log progress every 30 frames
             if frame_count % 30 == 0:
                 cards_sent = len(sent_labels)
-                print(f"[CV Service] Processed {frame_count} frames | Cards sent: {cards_sent}")
                 
     except WebSocketDisconnect:
         print(f"[CV Service] WebSocket disconnected for game: {game_id}")

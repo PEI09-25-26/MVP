@@ -5,6 +5,7 @@ from typing import Optional
 from card_mapper import CardMapper
 from referee import Referee
 import threading
+import time
 
 app = FastAPI(title="Card Game Backend")
 ref = Referee()
@@ -16,7 +17,7 @@ MIDDLEWARE_ROUND_END_URL = "http://localhost:8000/game/round_end"
 MAX_ROUNDS = 4  # 4 rondas por jogo
 MAX_RODADAS = 10  # 10 rodadas por ronda
 current_round = 1  # Ronda atual (1-4)
-current_hand = 0
+current_hand = ref.current_player -1
 
 class CardDTO(BaseModel):
     rank: str
@@ -28,11 +29,13 @@ def get_state():
     return ref.state()
 
 def send_state_to_middleware(ref):
-    try:
-        requests.post(MIDDLEWARE_URL, json=ref.state(), timeout=0.2)
-        print("[SYNC] State pushed to middleware")
-    except requests.exceptions.RequestException as e:
-        print(f"[WARN] State sync failed: {e}")
+    with threading.Lock():
+        time.sleep(0.05)
+        try:
+            requests.post(MIDDLEWARE_URL, json=ref.state(), timeout=1.0)
+            print("[SYNC] State pushed to middleware")
+        except requests.exceptions.RequestException as e:
+            print(f"[WARN] State sync failed: {e}")
 
 def push_state(ref):
     threading.Thread(
@@ -67,6 +70,8 @@ def new_round():
 @app.post("/card")
 def receive_card(card: CardDTO):
     global current_hand
+    if len(ref.card_queue) == 0:
+        current_hand = ref.current_player-1
     print(f"[DEBUG] Received card: {card.rank} {card.suit}")
     try:
         rank_index = CardMapper.RANKS.index(card.rank)
@@ -84,6 +89,7 @@ def receive_card(card: CardDTO):
         ref.set_trump()
         print(f"[DEBUG] Trump now: {CardMapper.get_card(ref.trump)} (suit: {ref.trump_suit})")
         push_state(ref)
+        current_hand -= 1
         return {
             "success": True,
             "message": "Trump card set"
@@ -92,7 +98,6 @@ def receive_card(card: CardDTO):
     current_hand += 1
 
     if len(ref.card_queue) >= 4:
-        current_hand = 0
         print("[DEBUG] Enough cards for a round, playing round...")
         round_ok = ref.play_round()
         print(f"[REFEREE] Round played. Team 1 points: {ref.team1_points}, Team 2 points: {ref.team2_points}")
@@ -122,7 +127,7 @@ def receive_card(card: CardDTO):
                 winner_team = 2
                 winner_points = ref.team2_points
             print(f"[RONDA] Acabou após 10 rodadas! Equipa {winner_team} ganhou com {winner_points} pontos")
-        
+
         if round_ended:
             # Notificar middleware sobre fim de ronda
             try:
@@ -140,29 +145,10 @@ def receive_card(card: CardDTO):
                 print(f"[WARN] Failed to notify middleware: {e}")
         
         push_state(ref)
-        
-        if not round_ok:
-            return {
-                "success": False,
-                "message": "Round failed (renuncia or invalid play)",
-                "round_ended": round_ended,
-                "winner_team": winner_team,
-                "winner_points": winner_points
-            }
-        return {
-            "success": True,
-            "message": "Round played",
-            "team1_points": ref.team1_points,
-            "team2_points": ref.team2_points,
-            "rounds_played": ref.rounds_played,
-            "round_ended": round_ended,
-            "winner_team": winner_team,
-            "winner_points": winner_points
-        }
 
     return {
         "success": True,
         "message": "Card queued",
-        "current_player": current_hand,
+        "current_player": current_hand%4,
         "queue_size": len(ref.card_queue)
     }
