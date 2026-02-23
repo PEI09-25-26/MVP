@@ -33,35 +33,21 @@ class MainMenuActivity : AppCompatActivity() {
                     if (roomId != null){
                         val resp = RetrofitClient.api.joinRoom(JoinRoomRequest(name, roomId))
                         if (resp.success) {
-                            val intent = Intent(this@MainMenuActivity, RoomActivity::class.java)
-                            intent.putExtra("roomId", resp.roomId)
-                            intent.putExtra("playerId", resp.playerId)
-                            startActivity(intent)
+                            goToRoom(resp.roomId, resp.playerId)
                         } else {
-                            Toast.makeText(
-                                this@MainMenuActivity,
-                                "Erro a entrar: ${resp}",
-                                Toast.LENGTH_LONG
-                            ).show()
+                            handleNetworkError("Erro: ${resp}")
                         }
                     } else {
                         val resp = RetrofitClient.api.createRoom(CreateRoomRequest(name))
                         if (resp.success) {
-                            val intent = Intent(this@MainMenuActivity, RoomActivity::class.java)
-                            intent.putExtra("roomId", resp.roomId)
-                            intent.putExtra("playerId", resp.playerId)
-                            startActivity(intent)
+                            goToRoom(resp.roomId, resp.playerId)
                         } else {
-                            Toast.makeText(
-                                this@MainMenuActivity,
-                                "Erro a entrar: ${resp}",
-                                Toast.LENGTH_LONG
-                            ).show()
+                            handleNetworkError("Erro: ${resp}")
                         }
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    Toast.makeText(this@MainMenuActivity, "Erro de rede: ${e.message}", Toast.LENGTH_LONG).show()
+                    handleNetworkError(e.message)
                 }
             }
         }
@@ -76,14 +62,14 @@ class MainMenuActivity : AppCompatActivity() {
                     val response = RetrofitClient.api.startGame(
                         StartGameRequest(playerName = name, roomId = roomId)
                     )
-                    
+
                     if (response.success) {
                         Toast.makeText(
                             this@MainMenuActivity,
                             "Vision AI Started!",
                             Toast.LENGTH_SHORT
                         ).show()
-                        
+
                         // Open VisionActivity
                         val intent = Intent(this@MainMenuActivity, VisionActivity::class.java)
                         intent.putExtra("playerName", name)
@@ -120,5 +106,22 @@ class MainMenuActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+
+private fun goToRoom(roomId: String, playerId: String) {
+        val intent = Intent(this, RoomActivity::class.java)
+        intent.putExtra("roomId", roomId)
+        intent.putExtra("playerId", playerId)
+        startActivity(intent)
+    }
+
+    private fun handleNetworkError(message: String?) {
+        Toast.makeText(this, "Servidor Offline. Entrando em modo Mock...", Toast.LENGTH_LONG).show()
+        // Se o servidor falhar, entramos na RoomActivity com dados de teste
+        val intent = Intent(this, RoomActivity::class.java)
+        intent.putExtra("roomId", "SALA_LOCAL")
+        intent.putExtra("playerId", "ID_LOCAL")
+        startActivity(intent)
     }
 }

@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.MVP.models.Player
 import com.example.MVP.models.RoomState
 import com.example.MVP.network.RetrofitClient
 import kotlinx.coroutines.Job
@@ -26,8 +27,8 @@ class RoomActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_room_mvp)
 
-        roomId = intent.getStringExtra("roomId") ?: ""
-        playerId = intent.getStringExtra("playerId") ?: ""
+        roomId = intent.getStringExtra("roomId") ?: "SALA_LOCAL"
+        playerId = intent.getStringExtra("playerId") ?: "ID_LOCAL"
 
         val txtRoom = findViewById<TextView>(R.id.txtRoom)
         val recycler = findViewById<RecyclerView>(R.id.recyclerPlayers)
@@ -39,18 +40,34 @@ class RoomActivity : AppCompatActivity() {
 
         btnBack.setOnClickListener { finish() }
 
+        if (roomId == "SALA_LOCAL") {
+            // Modo Mock: Adicionar jogadores fictícios
+            val dummyPlayers = listOf(
+                Player("ID_LOCAL", "Tu (Local)"),
+                Player("2", "Parceiro Bot"),
+                Player("3", "Adversário 1"),
+                Player("4", "Adversário 2")
+            )
+            recycler.adapter = PlayersAdapter(dummyPlayers)
+            btnStart.text = "Começar (Mock)"
+        }
+
         btnStart.setOnClickListener {
-            // Apenas para debug: tenta buscar estado agora
-            lifecycleScope.launch {
-                try {
-                    val state = RetrofitClient.api.getRoomState(roomId)
-                    if (state.gameStarted) {
-                        goToGame(state)
-                    } else {
-                        Toast.makeText(this@RoomActivity,"Aguardando jogadores...", Toast.LENGTH_SHORT).show()
+            if (roomId == "SALA_LOCAL") {
+                goToGameMock()
+            } else {
+                lifecycleScope.launch {
+                    try {
+                        val state = RetrofitClient.api.getRoomState(roomId)
+                        if (state.gameStarted) {
+                            goToGame(state)
+                        } else {
+                            Toast.makeText(this@RoomActivity, "Aguardando jogadores...", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(this@RoomActivity, "Servidor offline. Iniciando modo Mock...", Toast.LENGTH_SHORT).show()
+                        goToGameMock()
                     }
-                } catch (e: Exception) {
-                    Toast.makeText(this@RoomActivity,"Erro: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -58,7 +75,9 @@ class RoomActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        startPolling()
+        if (roomId != "SALA_LOCAL") {
+            startPolling()
+        }
     }
 
     override fun onPause() {
@@ -93,6 +112,14 @@ class RoomActivity : AppCompatActivity() {
         val intent = Intent(this, GameActivity::class.java)
         intent.putExtra("roomId", state.roomId)
         intent.putExtra("playerId", playerId)
+        startActivity(intent)
+        finish()
+    }
+
+    private fun goToGameMock() {
+        val intent = Intent(this, GameActivity::class.java)
+        intent.putExtra("roomId", "SALA_LOCAL")
+        intent.putExtra("playerId", "ID_LOCAL")
         startActivity(intent)
         finish()
     }
