@@ -12,6 +12,7 @@ ref = Referee()
 
 MIDDLEWARE_URL = "http://localhost:8000/game/state"
 MIDDLEWARE_ROUND_END_URL = "http://localhost:8000/game/round_end"
+MIDDLEWARE_TRICK_END_URL = "http://localhost:8000/game/trick_end"
 
 # Game constants
 MAX_ROUNDS = 4  # 4 rondas por jogo
@@ -101,6 +102,13 @@ def receive_card(card: CardDTO):
         print("[DEBUG] Enough cards for a round, playing round...")
         round_ok = ref.play_round()
         print(f"[REFEREE] Round played. Team 1 points: {ref.team1_points}, Team 2 points: {ref.team2_points}")
+        
+        # Notificar middleware para limpar zonas de exclusão (cada jogada de 4 cartas)
+        try:
+            requests.post(MIDDLEWARE_TRICK_END_URL, timeout=1)
+            print("[SYNC] Trick end notification sent to middleware")
+        except Exception as e:
+            print(f"[WARN] Failed to notify trick end: {e}")
         
         # Verificar se a ronda acabou (10 rodadas ou rendição)
         round_ended = False

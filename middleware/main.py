@@ -5,12 +5,10 @@ import asyncio
 import requests
 import websockets
 import json
-import threading
 import subprocess
 
 from models import CardDetection, ScanEvent
 from backend_client import BackendClient
-from frontend_client import FrontendClient
 #from qrcode_generator import generate_qr_code
 
 # ---------- App ----------
@@ -18,7 +16,6 @@ from frontend_client import FrontendClient
 app = FastAPI(title="CV Middleware", version="0.1")
 
 backend = BackendClient(base_url="http://localhost:8002")
-frontend = FrontendClient(base_url="http://localhost:8000")
 
 latest_state: dict = {}
 
@@ -84,15 +81,16 @@ class RoundEndData(BaseModel):
 # ---------- Routes ----------
 
 @app.post("/game/state")
-def receive_state(state: dict):
+async def receive_state(state: dict):
     global latest_state
     latest_state = state
-    def push():
+    for game_id, ws in list(active_connections.items()):
         try:
-            frontend.send_state(latest_state)
+            message = {"type": "game_state", **state}
+            await ws.send_text(json.dumps(message))
+            print(f"[Middleware] Game state pushed to {game_id}")
         except Exception as e:
-            print(f"[Middleware] Failed to push state to frontend: {e}")
-    threading.Thread(target=push, daemon=True).start()
+            print(f"[Middleware] Failed to push state to {game_id}: {e}")
     return {"ok": True}
 
 @app.get("/game/state")
@@ -107,8 +105,8 @@ async def round_end(data: RoundEndData):
     """
     print(f"[MIDDLEWARE] Ronda {data.round_number} acabou! Equipa {data.winner_team} ganhou com {data.winner_points} pontos")
     
-    # Enviar para todos os clientes conectados
-    for game_id, ws in active_connections.items():
+    # Enviar para todos os clientes conectados e resetar CV
+    for game_id, ws in list(active_connections.items()):
         try:
             message = {
                 "type": "round_end",
@@ -123,8 +121,34 @@ async def round_end(data: RoundEndData):
             print(f"[MIDDLEWARE] Round end notification sent to game {game_id}")
         except Exception as e:
             print(f"[MIDDLEWARE] Failed to send round end to {game_id}: {e}")
+
+        # Reset CV exclusion zones (with delay to allow cards to be removed)
+        if game_id in cv_connections:
+            try:
+                reset_command = json.dumps({"action": "reset_cards", "delay": 5})
+                await cv_connections[game_id].send(reset_command)
+                print(f"[MIDDLEWARE] CV reset sent for game {game_id} after round end")
+            except Exception as e:
+                print(f"[MIDDLEWARE] Failed to reset CV for {game_id}: {e}")
     
     return {"success": True}
+
+
+@app.post("/game/trick_end")
+async def trick_end():
+    """
+    Chamado após cada jogada de 4 cartas.
+    Limpa zonas de exclusão do CV (mas mantém sent_labels).
+    """
+    for game_id in list(cv_connections.keys()):
+        try:
+            reset_command = json.dumps({"action": "reset_cards", "delay": 5})
+            await cv_connections[game_id].send(reset_command)
+            print(f"[MIDDLEWARE] Trick ended - CV zones reset for game {game_id}")
+        except Exception as e:
+            print(f"[MIDDLEWARE] Failed to reset CV zones for {game_id}: {e}")
+    return {"success": True}
+
 
 @app.post("/game/new_round/{game_id}")
 async def new_round(game_id: str):
@@ -132,8 +156,8 @@ async def new_round(game_id: str):
     Inicia uma nova ronda: reset do CV e notifica game_service.
     """
     try:
-        # 1. Reset CV service
-        reset_message = {"action": "reset_cards"}
+        # 1. Reset CV service (with delay for cards to be removed from table)
+        reset_message = {"action": "reset_cards", "delay": 5}
         if game_id in cv_connections:
             cv_ws = cv_connections[game_id]
             await cv_ws.send(json.dumps(reset_message))
@@ -192,9 +216,9 @@ async def game_ready(game_id: str):
     if game_id in cv_connections:
         cv_ws = cv_connections[game_id]
         try:
-            reset_command = json.dumps({"action": "reset_cards"})
+            reset_command = json.dumps({"action": "reset_cards", "delay": 3, "full": True})
             await cv_ws.send(reset_command)
-            print(f"[Middleware] 🎮 Game started for {game_id} - CV history reset")
+            print(f"[Middleware] 🎮 Game started for {game_id} - CV full reset")
             return {"success": True, "message": "Game started, ready for cards"}
         except Exception as e:
             print(f"[Middleware] Error resetting CV: {e}")

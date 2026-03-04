@@ -32,8 +32,8 @@ class VisionActivity : AppCompatActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var webSocket: WebSocket
 
-    private val wsUrl = "ws://192.168.176.252:8000/ws/camera/"  // IP do Mac na rede local
-    // For emulator use: "ws://10.0.2.2:8000/ws/camera/"
+    private val wsUrl = "ws://10.126.19.45:8000/ws/camera/"  // IP do Mac na rede local
+    // For emulator use: "ws://10.126.19.45:8000/ws/camera/"
 
     private var gameId: String = "default"
 
@@ -272,6 +272,10 @@ class VisionActivity : AppCompatActivity() {
                             handleRoundEnd(json)
                             return@runOnUiThread
                         }
+                        if (json.has("type") && json.getString("type") == "game_state") {
+                            // Estado geral do jogo - ignorar aqui, tratado por deteção de carta
+                            return@runOnUiThread
+                        }
                     } catch (e: Exception) {
                         // Não é JSON, tratar como mensagem de carta normal
                     }
@@ -286,13 +290,12 @@ class VisionActivity : AppCompatActivity() {
                     val detection = JSONObject(detectionjson)
 
                     val rankjson = detection.optString("rank", "").lowercase()
-                    Toast.makeText(this@VisionActivity, "Rank: $rankjson", Toast.LENGTH_SHORT).show()
                     val suit = detection.optString("suit", "").lowercase()
-                    Toast.makeText(this@VisionActivity, "Suit: $suit", Toast.LENGTH_SHORT).show()
 
 
                     if (rankjson.isEmpty() || suit.isEmpty()) {
                         Log.w("VisionActivity", "Incomplete card detection data.")
+                        return@runOnUiThread
                     }
 
                     val rank = when (rankjson) {
@@ -304,12 +307,10 @@ class VisionActivity : AppCompatActivity() {
 
                     val cardIdentifier = "${suit}_$rank"
 
-                    Toast.makeText(this@VisionActivity, "Card: $cardIdentifier", Toast.LENGTH_SHORT).show()
                     val state = json.optString("game_state", "{}")
                     val game_state = JSONObject(state)
                     val message = game_state.optString("message", "{}")
                     if (message == "Trump card set"){
-                        Toast.makeText(this@VisionActivity, "Trump card set", Toast.LENGTH_SHORT).show()
                         updateCardView(cardIdentifier, trumpCard)
                     }
                     val player = game_state.optString("current_player", "")
