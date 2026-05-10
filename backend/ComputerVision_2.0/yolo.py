@@ -10,7 +10,7 @@ class CornerYoloDetector:
         model_path: str,
         min_conf: float = 0.75,
         iou: float = 0.5,
-        imgsz: int = 960,
+        imgsz: int = 640,
         max_det: int = 10,
     ) -> None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -22,10 +22,6 @@ class CornerYoloDetector:
         self.iou = iou
         self.imgsz = imgsz
         self.max_det = max_det
-        print(
-            "[CV2] Detector settings -> "
-            f"conf={self.min_conf:.2f}, iou={self.iou:.2f}, imgsz={self.imgsz}, max_det={self.max_det}"
-        )
 
     def detect(self, frame_bgr) -> List[Dict]:
         results = self.model.predict(
