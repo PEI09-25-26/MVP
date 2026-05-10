@@ -78,6 +78,17 @@ class RoundEndData(BaseModel):
     game_ended: bool
 
 
+class TrickEndData(BaseModel):
+    trick_number: int
+    winner_team: int
+    winner_points: int
+    team1_points: int
+    team2_points: int
+    team1_trick_points: int
+    team2_trick_points: int
+    round_number: int
+
+
 # ---------- Routes ----------
 
 @app.post("/game/state")
@@ -105,7 +116,8 @@ async def round_end(data: RoundEndData):
     """
     print(f"[MIDDLEWARE] Ronda {data.round_number} acabou! Equipa {data.winner_team} ganhou com {data.winner_points} pontos")
     
-    # Enviar para todos os clientes conectados e resetar CV
+    # Enviar para todos os clientes conectados.
+    # O reset CV no fim de ronda deve acontecer apenas ao carregar em "Nova Ronda".
     for game_id, ws in list(active_connections.items()):
         try:
             message = {
@@ -122,32 +134,54 @@ async def round_end(data: RoundEndData):
         except Exception as e:
             print(f"[MIDDLEWARE] Failed to send round end to {game_id}: {e}")
 
-        # Reset CV exclusion zones (with delay to allow cards to be removed)
-        if game_id in cv_connections:
-            try:
-                reset_command = json.dumps({"action": "reset_cards", "delay": 5})
-                await cv_connections[game_id].send(reset_command)
-                print(f"[MIDDLEWARE] CV reset sent for game {game_id} after round end")
-            except Exception as e:
-                print(f"[MIDDLEWARE] Failed to reset CV for {game_id}: {e}")
-    
+
     return {"success": True}
 
 
 @app.post("/game/trick_end")
-async def trick_end():
+async def trick_end(data: TrickEndData):
     """
     Chamado após cada jogada de 4 cartas.
-    Limpa zonas de exclusão do CV (mas mantém sent_labels).
+    Apenas notifica o frontend.
+    O reset das zonas da jogada é disparado pelo botão no frontend.
     """
-    for game_id in list(cv_connections.keys()):
+    for game_id, ws in list(active_connections.items()):
         try:
-            reset_command = json.dumps({"action": "reset_cards", "delay": 5})
-            await cv_connections[game_id].send(reset_command)
-            print(f"[MIDDLEWARE] Trick ended - CV zones reset for game {game_id}")
+            message = {
+                "type": "trick_end",
+                "round_number": data.round_number,
+                "trick_number": data.trick_number,
+                "winner_team": data.winner_team,
+                "winner_points": data.winner_points,
+                "team1_points": data.team1_points,
+                "team2_points": data.team2_points,
+                "team1_trick_points": data.team1_trick_points,
+                "team2_trick_points": data.team2_trick_points
+            }
+            await ws.send_text(json.dumps(message))
+            print(f"[MIDDLEWARE] Trick end notification sent to game {game_id}")
         except Exception as e:
-            print(f"[MIDDLEWARE] Failed to reset CV zones for {game_id}: {e}")
+            print(f"[MIDDLEWARE] Failed to send trick end to {game_id}: {e}")
+
     return {"success": True}
+
+
+@app.post("/game/confirm_trick_clear/{game_id}")
+async def confirm_trick_clear(game_id: str):
+    """
+    Chamado quando o utilizador confirma no botão de fim de rodada.
+    Faz reset parcial das zonas de exclusão para a próxima jogada.
+    """
+    if game_id in cv_connections:
+        try:
+            reset_command = json.dumps({"action": "reset_cards", "delay": 0})
+            await cv_connections[game_id].send(reset_command)
+            print(f"[MIDDLEWARE] Trick clear confirmed - CV zones reset for game {game_id}")
+            return {"success": True, "message": "Trick zones reset"}
+        except Exception as e:
+            print(f"[MIDDLEWARE] Failed to reset trick zones for {game_id}: {e}")
+            return {"success": False, "message": str(e)}
+    return {"success": False, "message": "Game not found"}
 
 
 @app.post("/game/new_round/{game_id}")
@@ -157,7 +191,7 @@ async def new_round(game_id: str):
     """
     try:
         # 1. Reset CV service (with delay for cards to be removed from table)
-        reset_message = {"action": "reset_cards", "delay": 5}
+        reset_message = {"action": "reset_cards", "delay": 5, "full": True}
         if game_id in cv_connections:
             cv_ws = cv_connections[game_id]
             await cv_ws.send(json.dumps(reset_message))

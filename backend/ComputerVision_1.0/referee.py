@@ -91,7 +91,7 @@ class Referee:
                     else:
                         last = (self.first_player + 3) % 4
 
-                    if not self.trump_was_played and card_suit == self.trump_suit and this_player==last:
+                    if not self.trump_was_played and round_suit == self.trump_suit and this_player==last:
                         print("[RENUNCIA] AN ILLEGAL PLAY HAS BEEN MADE!!")
                         if this_player % 2 != 0:
                             self.team1_victories += 4

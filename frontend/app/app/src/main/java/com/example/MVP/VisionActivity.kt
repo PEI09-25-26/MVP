@@ -32,7 +32,7 @@ class VisionActivity : AppCompatActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var webSocket: WebSocket
 
-    private val wsUrl = "ws://10.126.19.45:8000/ws/camera/"  // IP do Mac na rede local
+    private val wsUrl = "ws://192.168.1.238:8000/ws/camera/"  // IP do Mac na rede local
     // For emulator use: "ws://10.126.19.45:8000/ws/camera/"
 
     private var gameId: String = "default"
@@ -48,6 +48,10 @@ class VisionActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var resetRunnable: Runnable? = null
     private var lastWebSocketMessage: String? = null
+    private var waitingTableClearConfirmation: Boolean = false
+    private var isReconnecting: Boolean = false
+    private var reconnectAttempt: Int = 0
+    private var reconnectRunnable: Runnable? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -210,6 +214,14 @@ class VisionActivity : AppCompatActivity() {
     }
 
     /**
+     * Resets all table card boxes, including trump box.
+     */
+    private fun resetAllCardBoxes() {
+        resetCardsToBack()
+        trumpCard.setImageResource(R.drawable.card_back)
+    }
+
+    /**
      * Starts a 5-second timer to reset the cards.
      */
     private fun startResetTimer() {
@@ -256,6 +268,9 @@ class VisionActivity : AppCompatActivity() {
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.d("WS", "WebSocket connected to ${wsUrl + gameId}")
+                isReconnecting = false
+                reconnectAttempt = 0
+                cancelReconnect()
                 runOnUiThread {
                     Toast.makeText(this@VisionActivity, "Vision AI Connected", Toast.LENGTH_SHORT).show()
                 }
@@ -267,17 +282,30 @@ class VisionActivity : AppCompatActivity() {
                     // Tentar parsear como JSON para detectar mensagens especiais
                     try {
                         val json = JSONObject(text)
-                        if (json.has("type") && json.getString("type") == "round_end") {
-                            // Fim de ronda
-                            handleRoundEnd(json)
-                            return@runOnUiThread
-                        }
-                        if (json.has("type") && json.getString("type") == "game_state") {
-                            // Estado geral do jogo - ignorar aqui, tratado por deteção de carta
-                            return@runOnUiThread
+                        if (json.has("type")) {
+                            when (json.getString("type")) {
+                                "trick_end" -> {
+                                    handleTrickEnd(json)
+                                    return@runOnUiThread
+                                }
+                                "round_end" -> {
+                                    // Fim de ronda
+                                    handleRoundEnd(json)
+                                    return@runOnUiThread
+                                }
+                                "game_state" -> {
+                                    // Estado geral do jogo - ignorar aqui, tratado por deteção de carta
+                                    return@runOnUiThread
+                                }
+                            }
                         }
                     } catch (e: Exception) {
                         // Não é JSON, tratar como mensagem de carta normal
+                    }
+
+                    if (waitingTableClearConfirmation) {
+                        Log.d("VisionActivity", "Mensagem ignorada enquanto aguarda limpeza da mesa.")
+                        return@runOnUiThread
                     }
 
                     lastWebSocketMessage = text
@@ -302,6 +330,7 @@ class VisionActivity : AppCompatActivity() {
                         "k" -> "king"
                         "q" -> "queen"
                         "j" -> "jack"
+                        "a" -> "ace"
                         else -> rankjson
                     }
 
@@ -314,10 +343,6 @@ class VisionActivity : AppCompatActivity() {
                         updateCardView(cardIdentifier, trumpCard)
                     }
                     val player = game_state.optString("current_player", "")
-                    val queue_size = game_state.optString("queue_size", "{}")
-                    if (queue_size == "1"){
-                        resetCardsToBack()
-                    }
 
                     when (player) {
                         "1" -> {
@@ -339,12 +364,82 @@ class VisionActivity : AppCompatActivity() {
                 runOnUiThread {
                     Toast.makeText(this@VisionActivity, "Connection error: ${t.message}", Toast.LENGTH_LONG).show()
                 }
+                scheduleReconnect()
             }
 
             override fun onClosed(ws: WebSocket, code: Int, reason: String) {
                 Log.d("WS", "WebSocket closed: $reason")
+                scheduleReconnect()
             }
         })
+    }
+
+    private fun scheduleReconnect() {
+        if (isFinishing || isDestroyed || isReconnecting) return
+
+        isReconnecting = true
+        reconnectAttempt += 1
+        val delayMs = minOf(5000L, 1000L * reconnectAttempt)
+
+        reconnectRunnable = Runnable {
+            Log.d("WS", "Tentativa de reconexão #$reconnectAttempt")
+            isReconnecting = false
+            connectWebSocket()
+        }
+
+        reconnectRunnable?.let {
+            handler.postDelayed(it, delayMs)
+        }
+    }
+
+    private fun cancelReconnect() {
+        reconnectRunnable?.let { handler.removeCallbacks(it) }
+        reconnectRunnable = null
+        isReconnecting = false
+    }
+
+    private fun handleTrickEnd(json: JSONObject) {
+        val roundNumber = json.optInt("round_number", 1)
+        val trickNumber = json.optInt("trick_number", 0)
+        val winnerTeam = json.optInt("winner_team", 0)
+        val winnerPoints = json.optInt("winner_points", 0)
+        val team1TrickPoints = json.optInt("team1_trick_points", 0)
+        val team2TrickPoints = json.optInt("team2_trick_points", 0)
+        val team1Points = json.optInt("team1_points", 0)
+        val team2Points = json.optInt("team2_points", 0)
+
+        waitingTableClearConfirmation = true
+
+        val message = buildString {
+            append("Ronda $roundNumber • Rodada $trickNumber de 10\n\n")
+            append("Equipa $winnerTeam ganhou esta rodada (+$winnerPoints)\n")
+            append("Rodada:\n")
+            append("Equipa 1: +$team1TrickPoints\n")
+            append("Equipa 2: +$team2TrickPoints\n\n")
+            append("Totais da ronda:\n")
+            append("Equipa 1: $team1Points\n")
+            append("Equipa 2: $team2Points\n\n")
+            append("Retira as cartas da mesa e confirma para continuar.")
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Rodada concluída")
+            .setMessage(message)
+            .setCancelable(false)
+            .setPositiveButton("Limpar mesa e continuar") { dialog, _ ->
+                lifecycleScope.launch {
+                    try {
+                        RetrofitClient.api.confirmTrickClear(gameId)
+                    } catch (e: Exception) {
+                        Log.e("VisionActivity", "Error confirming trick clear", e)
+                    } finally {
+                        resetCardsToBack()
+                        waitingTableClearConfirmation = false
+                        dialog.dismiss()
+                    }
+                }
+            }
+            .show()
     }
 
     private fun handleRoundEnd(json: JSONObject) {
@@ -376,12 +471,16 @@ class VisionActivity : AppCompatActivity() {
         if (gameEnded) {
             // Jogo acabou - voltar ao menu
             builder.setPositiveButton("Voltar ao Menu") { dialog, _ ->
+                resetAllCardBoxes()
+                waitingTableClearConfirmation = false
                 dialog.dismiss()
                 finish()
             }
         } else {
             // Mais rondas disponíveis
             builder.setPositiveButton("Nova Ronda") { dialog, _ ->
+                resetAllCardBoxes()
+                waitingTableClearConfirmation = false
                 dialog.dismiss()
                 startNewRound()
             }
@@ -441,6 +540,7 @@ class VisionActivity : AppCompatActivity() {
         super.onDestroy()
         // Cancel timer to prevent memory leaks
         cancelResetTimer()
+        cancelReconnect()
         executor.shutdown()
 
         // Close WebSocket connection

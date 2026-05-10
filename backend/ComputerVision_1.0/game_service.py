@@ -99,17 +99,13 @@ def receive_card(card: CardDTO):
     current_hand += 1
 
     if len(ref.card_queue) >= 4:
+        prev_team1_points = ref.team1_points
+        prev_team2_points = ref.team2_points
+
         print("[DEBUG] Enough cards for a round, playing round...")
         round_ok = ref.play_round()
         print(f"[REFEREE] Round played. Team 1 points: {ref.team1_points}, Team 2 points: {ref.team2_points}")
-        
-        # Notificar middleware para limpar zonas de exclusão (cada jogada de 4 cartas)
-        try:
-            requests.post(MIDDLEWARE_TRICK_END_URL, timeout=1)
-            print("[SYNC] Trick end notification sent to middleware")
-        except Exception as e:
-            print(f"[WARN] Failed to notify trick end: {e}")
-        
+
         # Verificar se a ronda acabou (10 rodadas ou rendição)
         round_ended = False
         winner_team = None
@@ -135,6 +131,31 @@ def receive_card(card: CardDTO):
                 winner_team = 2
                 winner_points = ref.team2_points
             print(f"[RONDA] Acabou após 10 rodadas! Equipa {winner_team} ganhou com {winner_points} pontos")
+
+        # Notificar trick end apenas quando a ronda NÃO acaba nesta jogada
+        if not round_ended:
+            try:
+                trick_team1_gain = ref.team1_points - prev_team1_points
+                trick_team2_gain = ref.team2_points - prev_team2_points
+                trick_winner_player = ref.current_player
+                trick_winner_team = 1 if trick_winner_player in (1, 3) else 2
+                trick_winner_points = trick_team1_gain if trick_winner_team == 1 else trick_team2_gain
+
+                trick_data = {
+                    "trick_number": ref.rounds_played,
+                    "winner_team": trick_winner_team,
+                    "winner_points": trick_winner_points,
+                    "team1_points": ref.team1_points,
+                    "team2_points": ref.team2_points,
+                    "team1_trick_points": trick_team1_gain,
+                    "team2_trick_points": trick_team2_gain,
+                    "round_number": current_round
+                }
+
+                requests.post(MIDDLEWARE_TRICK_END_URL, json=trick_data, timeout=1)
+                print("[SYNC] Trick end notification sent to middleware")
+            except Exception as e:
+                print(f"[WARN] Failed to notify trick end: {e}")
 
         if round_ended:
             # Notificar middleware sobre fim de ronda
