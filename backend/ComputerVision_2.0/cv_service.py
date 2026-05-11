@@ -98,6 +98,25 @@ def resolve_model_path() -> Optional[str]:
 EXCLUSION_OVERLAP_THRESHOLD = 0.40
 
 
+def should_accept_card(rank: str, suit: str, confidence: float) -> bool:
+    """
+    Selectively filter cards based on rank and confidence.
+    - Cards 8, 9, 10: Never accepted (not used in Sueca)
+    - Aces: Accepted if confidence >= 0.5 (difficult to recognize)
+    - Others: Accepted if confidence >= 0.8 (normal threshold)
+    """
+    # Never accept 8, 9, 10
+    if rank in ("8", "9", "10"):
+        return False
+    
+    # Aces need lower confidence (they're hard to detect)
+    if rank == "A":
+        return confidence >= 0.5
+    
+    # All other cards need 0.8 confidence
+    return confidence >= 0.8
+
+
 @app.post("/cv/start")
 async def start_cv_service(request: StartCVRequest):
     global detector
@@ -213,6 +232,10 @@ async def cv_stream(websocket: WebSocket, game_id: str):
 
                 rank, suit = parse_label(det["label"])
                 if rank is None or suit is None:
+                    continue
+
+                # Apply selective confidence filtering
+                if not should_accept_card(rank, suit, det["confidence"]):
                     continue
 
                 card_key = f"{rank}_{suit}"

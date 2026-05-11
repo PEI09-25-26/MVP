@@ -1,4 +1,4 @@
-path: /home/goncalo/Desktop/1S_3M/PEI/MVP/backend/ComputerVision_3.0/final_model
+path: final_model
 train: train/images
 val: valid/images
 

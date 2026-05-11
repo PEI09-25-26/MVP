@@ -5,8 +5,7 @@ This repository contains the implementation of the project's Minimal Viable Prod
 
 ### Passo 1: Iniciar o CV Service (Terminal 1)
 ```bash
-cd backend/ComputerVision_2.0
-export CV2_MODEL_PATH=runs/archive3_final/weights/best.pt
+cd backend/ComputerVision_3.0
 uvicorn cv_service:app --host 0.0.0.0 --port 8001 --reload
 ```
 

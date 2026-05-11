@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from ultralytics import YOLO
 import torch
@@ -8,13 +8,18 @@ class CornerYoloDetector:
     def __init__(
         self,
         model_path: str,
-        min_conf: float = 0.50,
+        min_conf: float = 0.60,  # Lowered for small/distant cards
         iou: float = 0.5,
-        imgsz: int = 640,
-        max_det: int = 10,
+        imgsz: int = 640,  # Increased from 512 for better distant detection
+        max_det: int = 15,  # Increased from 10
     ) -> None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"[CV2] Loading YOLO model on {device}: {model_path}")
+        print(f"[CV3] Loading YOLO model on {device}: {model_path}")
+        print(f"[CV3] Configuration:")
+        print(f"[CV3]   - imgsz={imgsz} (image resolution for inference)")
+        print(f"[CV3]   - min_conf={min_conf} (confidence threshold)")
+        print(f"[CV3]   - iou={iou} (NMS IoU threshold)")
+        print(f"[CV3]   - max_det={max_det} (max detections per frame)")
         self.model = YOLO(model_path)
         self.model.to(device)
 
