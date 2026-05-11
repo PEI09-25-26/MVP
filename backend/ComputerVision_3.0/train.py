@@ -9,7 +9,7 @@ results = model.train(
     epochs=100,
     imgsz=800,
     batch=16, # Se der erro de "Out of Memory", reduz para 8 ou 4
-    device='mps',
+    device=0,
     scale=0.1,    
     degrees=0.0,  
     mosaic=0.5,   
@@ -17,5 +17,5 @@ results = model.train(
     hsv_s=0.7,    
     hsv_v=0.4,    
     project='runs/detect',
-    name='cards_v3_real_cam'
+    name='cards_v3_real_cam',
 )

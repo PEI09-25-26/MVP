@@ -1,4 +1,4 @@
-path: /Users/lucas/Desktop/Uni/3ºano/1ºsemestre/PEI/MVP/backend/ComputerVision_3.0/final_model
+path: /home/goncalo/Desktop/1S_3M/PEI/MVP/backend/ComputerVision_3.0/final_model
 train: train/images
 val: valid/images
 
