@@ -140,6 +140,7 @@ async def start_cv_service(request: StartCVRequest):
             "paused_until": 0,
             "trick_count": 0,
             "trick_locked": False,
+            "frame_consistency": {},
         }
 
         return {
@@ -173,11 +174,13 @@ async def cv_stream(websocket: WebSocket, game_id: str):
             "paused_until": 0,
             "trick_count": 0,
             "trick_locked": False,
+            "frame_consistency": {},
         }
 
     game_state = active_games[game_id]
     sent_labels = game_state["sent_labels"]
     exclusion_zones = game_state["exclusion_zones"]
+    frame_consistency = game_state["frame_consistency"]
 
     try:
         while True:
@@ -191,6 +194,7 @@ async def cv_stream(websocket: WebSocket, game_id: str):
                         full = command.get("full", False)
                         game_state["paused_until"] = time.time() + delay
                         exclusion_zones.clear()
+                        frame_consistency.clear()
                         game_state["trick_count"] = 0
                         game_state["trick_locked"] = False
                         if full:
@@ -218,6 +222,12 @@ async def cv_stream(websocket: WebSocket, game_id: str):
                 continue
 
             detections = detector.detect(frame)
+            
+            # Clean up frame_consistency for positions that no longer exist
+            positions_to_remove = [pos for pos in frame_consistency if pos >= len(detections)]
+            for pos in positions_to_remove:
+                del frame_consistency[pos]
+            
             for i, det in enumerate(detections):
                 bbox = det["bbox"]
 
@@ -239,29 +249,42 @@ async def cv_stream(websocket: WebSocket, game_id: str):
                     continue
 
                 card_key = f"{rank}_{suit}"
-                if card_key in sent_labels:
-                    continue
+                label_str = f"{rank} of {suit}"
+                
+                # Consecutive frames validation
+                if i not in frame_consistency:
+                    frame_consistency[i] = {
+                        "label": label_str,
+                        "count": 1,
+                        "card_key": card_key
+                    }
+                else:
+                    prev_consistency = frame_consistency[i]
+                    if prev_consistency["label"] == label_str and card_key:
+                        prev_consistency["count"] += 1
+                        
+                        if prev_consistency["count"] == 3 and card_key not in sent_labels:
+                            sent_labels.add(card_key)
+                            exclusion_zones.append(tuple(bbox))
+                            game_state["trick_count"] += 1
 
-                sent_labels.add(card_key)
-                exclusion_zones.append(tuple(bbox))
-                game_state["trick_count"] += 1
+                            detection = {
+                                "rank": rank,
+                                "suit": suit,
+                                "confidence": det["confidence"],
+                                "position": i,
+                            }
+                            await websocket.send_json({"success": True, "detection": detection})
 
-                detection = {
-                    "rank": rank,
-                    "suit": suit,
-                    "confidence": det["confidence"],
-                    "position": i,
-                }
-                await websocket.send_json({"success": True, "detection": detection})
-                print(
-                    f"[CV2] New card detected: {rank} of {suit} "
-                    f"(confidence: {det['confidence']:.2%})"
-                )
-
-                if game_state["trick_count"] >= MAX_CARDS_PER_TRICK:
-                    game_state["trick_locked"] = True
-                    print("[CV2] Trick locked after 4 cards. Waiting for reset_cards.")
-                    break
+                            if game_state["trick_count"] >= MAX_CARDS_PER_TRICK:
+                                game_state["trick_locked"] = True
+                                break
+                    else:
+                        frame_consistency[i] = {
+                            "label": label_str,
+                            "count": 1,
+                            "card_key": card_key
+                        }
 
     except WebSocketDisconnect:
         print(f"[CV2] WebSocket disconnected for game: {game_id}")
