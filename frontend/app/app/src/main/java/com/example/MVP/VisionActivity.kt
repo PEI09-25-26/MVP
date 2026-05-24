@@ -32,7 +32,7 @@ class VisionActivity : AppCompatActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var webSocket: WebSocket
 
-    private val wsUrl = "ws://192.168.209.47:8000/ws/camera/"  // IP do Mac na rede local
+    private val wsUrl = "ws://192.168.1.65:8000/ws/camera/"  // IP do Mac na rede local
     // For emulator use: "ws://10.126.19.45:8000/ws/camera/"
 
     private var gameId: String = "default"

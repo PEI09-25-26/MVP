@@ -268,6 +268,9 @@ async def cv_stream(websocket: WebSocket, game_id: str):
                             exclusion_zones.append(tuple(bbox))
                             game_state["trick_count"] += 1
 
+                            with open("cartas_detetadas.txt", "a",encoding="utf-8") as f:
+                                f.write(f"{rank} {suit} .\n")
+
                             detection = {
                                 "rank": rank,
                                 "suit": suit,
